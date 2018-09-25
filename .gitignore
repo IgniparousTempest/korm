@@ -1,0 +1,8 @@
+# Downloaded gradle files
+.gradle/
+
+# Compiled directory
+out/
+
+# IntelliJ
+.idea/
