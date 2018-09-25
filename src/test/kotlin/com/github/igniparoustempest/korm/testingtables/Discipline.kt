@@ -1,4 +1,4 @@
-package com.caughtknee.korm
+package com.github.igniparoustempest.korm.testingtables
 
 data class Discipline(val department: Char, val year: Int) {
     override fun toString(): String {

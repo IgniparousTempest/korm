@@ -1,0 +1,248 @@
+package com.github.igniparoustempest.korm
+
+import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
+import com.github.igniparoustempest.korm.types.PrimaryKey
+import java.sql.Connection
+import java.sql.DriverManager
+import java.sql.PreparedStatement
+import java.sql.ResultSet
+import java.sql.SQLException
+import kotlin.reflect.KClass
+import kotlin.reflect.KType
+import kotlin.reflect.KVisibility
+import kotlin.reflect.full.createType
+import kotlin.reflect.full.declaredMemberProperties
+import kotlin.reflect.full.primaryConstructor
+import kotlin.reflect.full.withNullability
+import kotlin.reflect.jvm.reflect
+import kotlin.reflect.KMutableProperty
+
+
+class Korm(path: String? = null, conn: Connection? = null) {
+    private val conn: Connection = when {
+        conn != null -> conn
+        path == null -> DriverManager.getConnection("jdbc:sqlite::memory:")
+        else -> DriverManager.getConnection("jdbc:sqlite:$path")
+    }
+    private val coders = mutableMapOf<KType, Coder<Any>>()
+
+    /**
+     * Creates a table based on a row that will be inserted into it.
+     * There is no need to call this as inserting calls this automatically.
+     * @throws UnsupportedDataTypeException If the row class contains a member with an unsupported data type.
+     */
+    fun <T: Any> createTable(row: T) {
+        val tableName = tableName(row)
+        val columns = columnNames(row)
+        val columnNames = columns.joinToString(", ") {
+            var colType = it.name + " " +
+                if (coders.contains(it.returnType.withNullability(false)))
+                    coders[it.returnType.withNullability(false)]!!.dataType
+                else
+                    when (it.returnType.withNullability(false)) {
+                        PrimaryKey::class.createType() -> "INTEGER PRIMARY KEY"
+                        Float::class.createType() -> "REAL"
+                        Int::class.createType() -> "INTEGER"
+                        String::class.createType() -> "TEXT"
+                        else -> throw UnsupportedDataTypeException("Invalid data type ${it.returnType}.")
+                    }
+            if (!it.returnType.isMarkedNullable)
+                colType += " NOT NULL"
+
+            colType
+        }
+        val sql = "CREATE TABLE IF NOT EXISTS $tableName ($columnNames)"
+
+        try {
+            val stmt = conn.createStatement()
+            stmt.execute(sql)
+            stmt.close()
+        } catch (e: SQLException) {
+            throw e
+        }
+    }
+
+    /**
+     * Deletes rows in the table that match the specified condition.
+     */
+    fun <T: Any> delete(clazz: KClass<T>, condition: KormCondition) {
+        val tableName = clazz.simpleName
+        val sql = "DELETE FROM $tableName WHERE ${condition.sql}"
+
+        try {
+            val pstmt = conn.prepareStatement(sql)
+            condition.values.forEachIndexed { i, col ->
+                applyEncoder(col::class.createType(nullable = false), pstmt, i + 1, col)
+            }
+            pstmt.executeUpdate()
+            pstmt.close()
+        } catch (e: SQLException) {
+            // Creates the table if it doesn't already exist
+            if (e.message == "[SQLITE_ERROR] SQL error or missing database (no such table: $tableName)") {
+                return
+            }
+            else
+                throw e
+        }
+    }
+
+    /**
+     * Drops the specified table.
+     */
+    fun <T: Any> drop(clazz: KClass<T>) {
+        val tableName = clazz.simpleName
+        val sql = "DROP TABLE IF EXISTS $tableName"
+        try {
+            val stmt = conn.createStatement()
+            stmt.executeUpdate(sql)
+            stmt.close()
+        } catch (e: SQLException) {
+            throw e
+        }
+    }
+
+    /**
+     * Gets all rows from a table that match the specified condition.
+     * @throws UnsupportedDataTypeException If the T class contains a member with an unsupported data type.
+     */
+    fun <T: Any> find(clazz: KClass<T>, condition: KormCondition? = null): List<T> {
+        val tableString = clazz.simpleName
+        var sql = "SELECT * FROM $tableString"
+        if (condition != null)
+            sql += " WHERE " + condition.sql
+
+        val results = mutableListOf<T>()
+
+        try {
+            val pstmt = conn.prepareStatement(sql)
+            condition?.values?.forEachIndexed { i, col ->
+                applyEncoder(col::class.createType(nullable = false), pstmt, i + 1, col)
+            }
+            val rs = pstmt.executeQuery()
+
+            while (rs.next()) {
+                val params = clazz.primaryConstructor!!.parameters.map {
+                    applyDecoder(it.type.withNullability(false), rs, it.name)
+                }.toTypedArray()
+                results.add(clazz.primaryConstructor!!.call(*params))
+            }
+
+            rs.close()
+            pstmt.close()
+        } catch (e: SQLException) {
+            if (e.message == "[SQLITE_ERROR] SQL error or missing database (no such table: $tableString)")
+                return emptyList()
+            else
+                throw e
+        }
+
+        return results
+    }
+
+    /**
+     * Inserts a row into the table.
+     * @throws UnsupportedDataTypeException If the row class contains a member with an unsupported data type.
+     */
+    fun <T: Any> insert(row: T): T {
+        val tableName = tableName(row)
+        val columns = columnNames(row).filter { it.returnType != PrimaryKey::class.createType() }
+        val columnString = columns.joinToString(",") { it.name }
+        val valuesString = columns.joinToString(",") { "?" }
+        val sql = "INSERT INTO $tableName($columnString) VALUES($valuesString)"
+
+        try {
+            val pstmt = conn.prepareStatement(sql)
+            columns.forEachIndexed { i, col ->
+                applyEncoder(col.returnType.withNullability(false), pstmt, i + 1, readPropery(row, col.name))
+            }
+            pstmt.executeUpdate()
+            val generatedKeys = pstmt.generatedKeys
+            pstmt.close()
+
+            // Create copy of row with the correct primary key
+            generatedKeys.next()
+            val key = PrimaryKey(generatedKeys.getInt("last_insert_rowid()"))
+            val primaryKeyProperty = columnNames(row).first { it.returnType.withNullability(false) == PrimaryKey::class.createType() }
+            if (primaryKeyProperty is KMutableProperty<*>)
+                primaryKeyProperty.setter.call(row, key)
+            return row
+        } catch (e: SQLException) {
+            // Creates the table if it doesn't already exist
+            if (e.message == "[SQLITE_ERROR] SQL error or missing database (no such table: $tableName)") {
+                createTable(row)
+                return insert(row)
+            }
+            else
+                throw e
+        }
+    }
+
+    /**
+     * Updates a row based on the specified conditions.
+     */
+    fun <T: Any> update(clazz: KClass<T>, updater: KormUpdater) {
+        val tableName = clazz.simpleName
+        var sql = "UPDATE $tableName SET ${updater.sql}"
+        if (updater.condition != null)
+            sql += " WHERE ${updater.condition.sql}"
+
+        try {
+            val pstmt = conn.prepareStatement(sql)
+            val columns = updater.values + (updater.condition?.values ?: emptyList())
+            columns.forEachIndexed { i, col ->
+                applyEncoder(col::class.createType(nullable = false), pstmt, i + 1, col)
+            }
+            pstmt.executeUpdate()
+            pstmt.close()
+        } catch (e: SQLException) {
+            // Creates the table if it doesn't already exist
+            if (e.message == "[SQLITE_ERROR] SQL error or missing database (no such table: $tableName)")
+                return
+            else
+                throw e
+        }
+    }
+
+    fun close() {
+        conn.close()
+    }
+
+    fun <T: Any> addCoder(encoder: Encoder<T>, decoder: Decoder<T>, dataType: String) {
+        @Suppress("UNCHECKED_CAST")
+        coders[decoder.reflect()!!.returnType] = Coder(encoder, decoder, dataType) as Coder<Any>
+    }
+
+    private fun <T: Any> applyEncoder(type: KType, pstmt: PreparedStatement, index: Int, data: T) {
+        if (coders.contains(type))
+            coders[type]!!.encoder(pstmt, index, data)
+        else
+            when (type) {
+                Float::class.createType() -> pstmt.setFloating(index, data as Float?)
+                Int::class.createType() -> pstmt.setInteger(index, data as Int?)
+                PrimaryKey::class.createType() -> pstmt.setInteger(index, (data as PrimaryKey).value)
+                String::class.createType() -> pstmt.setString(index, data as String?)
+                else -> throw UnsupportedDataTypeException("Invalid data type $type.")
+            }
+    }
+
+    private fun applyDecoder(type: KType, rs: ResultSet, columnName: String?): Any? {
+        return if (coders.contains(type))
+            coders[type]!!.decoder(rs, columnName)
+        else
+            when (type) {
+                Float::class.createType() -> rs.getFloating(columnName)
+                Int::class.createType() -> rs.getInteger(columnName)
+                PrimaryKey::class.createType() -> PrimaryKey(rs.getInteger(columnName))
+                String::class.createType() -> rs.getString(columnName)
+                else -> throw UnsupportedDataTypeException("Invalid data type $type.")
+            }
+    }
+
+    private fun <T: Any> tableName(row: T) = row::class.simpleName
+    private fun <T: Any> columnNames(row: T) = row::class.declaredMemberProperties.filter { it.visibility == KVisibility.PUBLIC }
+    fun <T: Any?> readPropery(instance: Any, propertyName: String): T {
+        val clazz = instance.javaClass.kotlin
+        @Suppress("UNCHECKED_CAST")
+        return clazz.declaredMemberProperties.first { it.name == propertyName }.get(instance) as T
+    }
+}

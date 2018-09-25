@@ -1,4 +1,4 @@
-package com.caughtknee.korm.exceptions
+package com.github.igniparoustempest.korm.exceptions
 
 import java.lang.Exception
 

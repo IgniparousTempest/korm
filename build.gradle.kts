@@ -5,8 +5,8 @@ plugins {
     kotlin("jvm") version "1.2.71"
 }
 
-group = "com.caughtknee"
-version = "1.0.0"
+group = "com.github.igniparoustempest"
+version = "v0.1"
 
 val kotlinVersion = plugins.getPlugin(KotlinPluginWrapper::class.java).kotlinPluginVersion
 
@@ -20,5 +20,6 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.23.1")
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.3.1")
-
+    testImplementation("io.mockk:mockk:1.8.7")
+    testImplementation("org.fluttercode.datafactory:datafactory:0.8")
 }

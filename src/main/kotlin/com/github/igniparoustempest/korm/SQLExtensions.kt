@@ -1,4 +1,4 @@
-package com.caughtknee.korm
+package com.github.igniparoustempest.korm
 
 import java.sql.PreparedStatement
 import java.sql.ResultSet
