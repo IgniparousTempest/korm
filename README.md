@@ -14,7 +14,7 @@ allprojects {
 }
 
 dependencies {
-    implementation("com.github.igniparoustempest:korm:v0.1")
+    implementation("com.github.IgniparousTempest:korm:v0.1")
 }
 ```
 

@@ -23,3 +23,8 @@ dependencies {
     testImplementation("io.mockk:mockk:1.8.7")
     testImplementation("org.fluttercode.datafactory:datafactory:0.8")
 }
+
+// Task to run all tests
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
