@@ -12,10 +12,11 @@ import kotlin.reflect.KType
 import kotlin.reflect.KVisibility
 import kotlin.reflect.full.createType
 import kotlin.reflect.full.declaredMemberProperties
+import kotlin.reflect.full.instanceParameter
+import kotlin.reflect.full.memberFunctions
 import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.full.withNullability
 import kotlin.reflect.jvm.reflect
-import kotlin.reflect.KMutableProperty
 
 
 class Korm(path: String? = null, conn: Connection? = null) {
@@ -153,7 +154,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
         try {
             val pstmt = conn.prepareStatement(sql)
             columns.forEachIndexed { i, col ->
-                applyEncoder(col.returnType.withNullability(false), pstmt, i + 1, readPropery(row, col.name))
+                applyEncoder(col.returnType.withNullability(false), pstmt, i + 1, readProperty(row, col.name))
             }
             pstmt.executeUpdate()
             val generatedKeys = pstmt.generatedKeys
@@ -163,9 +164,8 @@ class Korm(path: String? = null, conn: Connection? = null) {
             generatedKeys.next()
             val key = PrimaryKey(generatedKeys.getInt("last_insert_rowid()"))
             val primaryKeyProperty = columnNames(row).first { it.returnType.withNullability(false) == PrimaryKey::class.createType() }
-            if (primaryKeyProperty is KMutableProperty<*>)
-                primaryKeyProperty.setter.call(row, key)
-            return row
+            val updates = mapOf(primaryKeyProperty.name to key)
+            return reflectCopy(row, updates)
         } catch (e: SQLException) {
             // Creates the table if it doesn't already exist
             if (e.message == "[SQLITE_ERROR] SQL error or missing database (no such table: $tableName)") {
@@ -179,6 +179,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
 
     /**
      * Updates a row based on the specified conditions.
+     * @throws UnsupportedDataTypeException If the class contains a member with an unsupported data type.
      */
     fun <T: Any> update(clazz: KClass<T>, updater: KormUpdater) {
         val tableName = clazz.simpleName
@@ -212,7 +213,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
         coders[decoder.reflect()!!.returnType] = Coder(encoder, decoder, dataType) as Coder<Any>
     }
 
-    private fun <T: Any> applyEncoder(type: KType, pstmt: PreparedStatement, index: Int, data: T) {
+    private fun <T: Any> applyEncoder(type: KType, pstmt: PreparedStatement, index: Int, data: T?) {
         if (coders.contains(type))
             coders[type]!!.encoder(pstmt, index, data)
         else
@@ -238,11 +239,40 @@ class Korm(path: String? = null, conn: Connection? = null) {
             }
     }
 
+    /**
+     * Returns a copy of the object with the specified updates applied to the copy.
+     * @param row The object to apply the update to.
+     * @param updates A map of member property names to new value.
+     * @return A copy of the object with the updates applied.
+     */
+    private fun <T: Any> reflectCopy(row: T, updates: Map<String, Any>): T {
+        @Suppress("UNCHECKED_CAST")
+        return with(row::class.memberFunctions.first { it.name == "copy" }) {
+            callBy(mapOf(instanceParameter!! to row)
+                    .plus(updates.mapNotNull { (property, newValue) ->
+                        parameters.firstOrNull { it.name == property }
+                                ?.let { it to newValue }
+                    })
+            )
+        } as T
+    }
+
+    /**
+     * Gets the name of a class from an instance of that class.
+     */
     private fun <T: Any> tableName(row: T) = row::class.simpleName
+
+    /**
+     * Gets the name of all member properties of an object.
+     */
     private fun <T: Any> columnNames(row: T) = row::class.declaredMemberProperties.filter { it.visibility == KVisibility.PUBLIC }
-    fun <T: Any?> readPropery(instance: Any, propertyName: String): T {
+
+    /**
+     * Reads a property from a object based on the name of the property.
+     */
+    private fun <T: Any> readProperty(instance: T, propertyName: String): T? {
         val clazz = instance.javaClass.kotlin
         @Suppress("UNCHECKED_CAST")
-        return clazz.declaredMemberProperties.first { it.name == propertyName }.get(instance) as T
+        return clazz.declaredMemberProperties.first { it.name == propertyName }.get(instance) as T?
     }
 }
