@@ -16,14 +16,21 @@ import kotlin.test.assertEquals
 class KormTest {
     @Test
     fun createTable() {
-        val student = randomStudent()
         val conn = mockk<Connection>()
         val statement = mockk<Statement>(relaxed = true)
         val orm = spyk(Korm(conn = conn))
         every { conn.createStatement() } returns statement
-        orm.createTable(student)
+        orm.createTable(randomStudent())
 
         verify { statement.execute("CREATE TABLE IF NOT EXISTS Student (age INTEGER NOT NULL, firstName TEXT NOT NULL, height REAL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)") }
+
+        // Try with move complex values
+        val encoder: Encoder<Discipline> = { ps, parameterIndex, x -> ps.setString(parameterIndex, x.toString())}
+        val decoder: Decoder<Discipline> = { rs, columnLabel -> Discipline.fromString(rs.getString(columnLabel))}
+        orm.addCoder(encoder, decoder, "TEXT")
+        orm.createTable(randomStudentAdvanced())
+
+        verify { statement.execute("CREATE TABLE IF NOT EXISTS StudentAdvanced (age INTEGER NOT NULL, discipline TEXT NOT NULL, firstName TEXT NOT NULL, height REAL, isCurrent INTEGER NOT NULL, isFailing INTEGER NOT NULL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)") }
     }
 
     @Test
