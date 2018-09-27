@@ -8,14 +8,15 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.SQLException
 import kotlin.reflect.KClass
+import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
-import kotlin.reflect.KVisibility
 import kotlin.reflect.full.createType
 import kotlin.reflect.full.declaredMemberProperties
 import kotlin.reflect.full.instanceParameter
 import kotlin.reflect.full.memberFunctions
 import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.full.withNullability
+import kotlin.reflect.jvm.isAccessible
 import kotlin.reflect.jvm.reflect
 
 
@@ -42,6 +43,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
                 else
                     when (it.returnType.withNullability(false)) {
                         PrimaryKey::class.createType() -> "INTEGER PRIMARY KEY"
+                        Boolean::class.createType() -> "INTEGER"
                         Float::class.createType() -> "REAL"
                         Int::class.createType() -> "INTEGER"
                         String::class.createType() -> "TEXT"
@@ -121,8 +123,10 @@ class Korm(path: String? = null, conn: Connection? = null) {
             }
             val rs = pstmt.executeQuery()
 
+            val publicProperties = columnNames(clazz).map { it.name }
+            val columns = clazz.primaryConstructor!!.parameters.filter { publicProperties.contains(it.name) }
             while (rs.next()) {
-                val params = clazz.primaryConstructor!!.parameters.map {
+                val params = columns.map {
                     applyDecoder(it.type.withNullability(false), rs, it.name)
                 }.toTypedArray()
                 results.add(clazz.primaryConstructor!!.call(*params))
@@ -218,6 +222,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
             coders[type]!!.encoder(pstmt, index, data)
         else
             when (type) {
+                Boolean::class.createType() -> pstmt.setBool(index, data as Boolean?)
                 Float::class.createType() -> pstmt.setFloating(index, data as Float?)
                 Int::class.createType() -> pstmt.setInteger(index, data as Int?)
                 PrimaryKey::class.createType() -> pstmt.setInteger(index, (data as PrimaryKey).value)
@@ -231,6 +236,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
             coders[type]!!.decoder(rs, columnName)
         else
             when (type) {
+                Boolean::class.createType() -> rs.getBool(columnName)
                 Float::class.createType() -> rs.getFloating(columnName)
                 Int::class.createType() -> rs.getInteger(columnName)
                 PrimaryKey::class.createType() -> PrimaryKey(rs.getInteger(columnName))
@@ -265,14 +271,22 @@ class Korm(path: String? = null, conn: Connection? = null) {
     /**
      * Gets the name of all member properties of an object.
      */
-    private fun <T: Any> columnNames(row: T) = row::class.declaredMemberProperties.filter { it.visibility == KVisibility.PUBLIC }
+    private fun <T: Any> columnNames(row: T) = columnNames(row::class)
+    private fun <T: KClass<*>> columnNames(clazz: T): List<KProperty1<out String, Any?>> {
+        val parametersNames = clazz.primaryConstructor!!.parameters.map { it.name }
+        return clazz.declaredMemberProperties.filter { parametersNames.contains(it.name) } as List<KProperty1<out String, Any?>>
+    }
 
     /**
      * Reads a property from a object based on the name of the property.
+     * Can read private properties too.
      */
     private fun <T: Any> readProperty(instance: T, propertyName: String): T? {
         val clazz = instance.javaClass.kotlin
         @Suppress("UNCHECKED_CAST")
-        return clazz.declaredMemberProperties.first { it.name == propertyName }.get(instance) as T?
+        clazz.declaredMemberProperties.first { it.name == propertyName }.let {
+            it.isAccessible = true
+            return it.get(instance) as T?
+        }
     }
 }
