@@ -1,5 +1,6 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.mock.MockConnection
 import com.github.igniparoustempest.korm.testingtables.Discipline
 import com.github.igniparoustempest.korm.testingtables.Student
 import com.github.igniparoustempest.korm.testingtables.StudentAdvanced
@@ -17,21 +18,17 @@ class KormTest {
     @Test
     fun createTable() {
         val student = randomStudent()
-        val conn = mockk<Connection>()
-        val statement = mockk<Statement>(relaxed = true)
+        val conn = MockConnection()
         val orm = spyk(Korm(conn = conn))
-        every { conn.createStatement() } returns statement
         orm.createTable(student)
 
-        verify { statement.execute("CREATE TABLE IF NOT EXISTS Student (age INTEGER NOT NULL, firstName TEXT NOT NULL, height REAL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)") }
+        verify { conn.statement.execute("CREATE TABLE IF NOT EXISTS Student (age INTEGER NOT NULL, firstName TEXT NOT NULL, height REAL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)") }
     }
 
     @Test
     fun delete() {
-        val conn = mockk<Connection>()
-        val statement = mockk<PreparedStatement>(relaxed = true)
+        val conn = spyk(MockConnection())
         val orm = spyk(Korm(conn = conn))
-        every { conn.prepareStatement(any()) } returns statement
         orm.delete(Student::class, (Student::studentId eq 2) and (Student::age eq 12))
 
         verify { conn.prepareStatement("DELETE FROM Student WHERE studentId = ? AND age = ?") }
@@ -39,21 +36,17 @@ class KormTest {
 
     @Test
     fun drop() {
-        val conn = mockk<Connection>()
-        val statement = mockk<Statement>(relaxed = true)
+        val conn = MockConnection()
         val orm = spyk(Korm(conn = conn))
-        every { conn.createStatement() } returns statement
         orm.drop(Student::class)
 
-        verify { statement.executeUpdate("DROP TABLE IF EXISTS Student") }
+        verify { conn.statement.executeUpdate("DROP TABLE IF EXISTS Student") }
     }
 
     @Test
     fun find() {
-        val conn = mockk<Connection>()
-        val statement = mockk<PreparedStatement>(relaxed = true)
+        val conn = spyk(MockConnection())
         val orm = spyk(Korm(conn = conn))
-        every { conn.prepareStatement(any()) } returns statement
         orm.find(Student::class)
 
         verify { conn.prepareStatement("SELECT * FROM Student") }
@@ -67,10 +60,8 @@ class KormTest {
     @Test
     fun insert() {
         val student = randomStudent()
-        val conn = mockk<Connection>()
-        val statement = mockk<PreparedStatement>(relaxed = true)
+        val conn = spyk(MockConnection())
         val orm = spyk(Korm(conn = conn))
-        every { conn.prepareStatement(any()) } returns statement
         orm.insert(student)
 
         verify { conn.prepareStatement("INSERT INTO Student(age,firstName,height,maidenName,surname) VALUES(?,?,?,?,?)") }
@@ -78,10 +69,8 @@ class KormTest {
 
     @Test
     fun update() {
-        val conn = mockk<Connection>()
-        val statement = mockk<PreparedStatement>(relaxed = true)
+        val conn = spyk(MockConnection())
         val orm = spyk(Korm(conn = conn))
-        every { conn.prepareStatement(any()) } returns statement
         val condition = (Student::age gt 99) and (Student::maidenName eq "Donald") and Student::height.isNull()
         val updater = (Student::age set 100) and (Student::maidenName set null) onCondition condition
         orm.update(Student::class, updater)
