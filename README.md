@@ -38,7 +38,7 @@ The insert function returns the class with the primary keys and foreign keys mat
 
 ```kotlin
 data class Student(
-    var studentId: PrimaryKey = PrimaryKey(),
+    val studentId: PrimaryKey = PrimaryKey(),
     val firstName: String,
     val surname: String,
     val maidenName: String?,
