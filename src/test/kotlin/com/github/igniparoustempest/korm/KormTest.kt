@@ -27,7 +27,7 @@ class KormTest {
 
     @Test
     fun delete() {
-        val conn = spyk<MockConnection>()
+        val conn = spyk(MockConnection())
         val orm = spyk(Korm(conn = conn))
         orm.delete(Student::class, (Student::studentId eq 2) and (Student::age eq 12))
 
