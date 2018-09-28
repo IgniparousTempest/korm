@@ -267,6 +267,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
      * Gets the name of a class from an instance of that class.
      */
     private fun <T: Any> tableName(row: T) = row::class.simpleName
+    private fun <T: KClass<*>> tableName(clazz: T) = clazz.simpleName
 
     /**
      * Gets the name of all member properties of an object.
