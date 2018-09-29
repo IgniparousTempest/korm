@@ -6,4 +6,5 @@ out/
 build/
 
 # IntelliJ
+korm.iml
 .idea/

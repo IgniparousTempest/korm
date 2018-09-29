@@ -3,26 +3,27 @@ package com.github.igniparoustempest.korm
 import com.github.igniparoustempest.korm.testingtables.Discipline
 import com.github.igniparoustempest.korm.testingtables.Student
 import com.github.igniparoustempest.korm.testingtables.StudentAdvanced
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.spyk
-import io.mockk.verify
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import java.sql.Connection
 import java.sql.PreparedStatement
+import java.sql.ResultSet
 import java.sql.Statement
 import kotlin.test.assertEquals
 
 class KormTest {
     @Test
     fun createTable() {
-        val conn = mockk<Connection>()
-        val statement = mockk<Statement>(relaxed = true)
-        val orm = spyk(Korm(conn = conn))
-        every { conn.createStatement() } returns statement
+        val conn = mock(Connection::class.java)
+        val statement = mock(Statement::class.java)
+        val orm = Korm(conn = conn)
+        Mockito.`when`(conn.createStatement()).thenReturn(statement)
         orm.createTable(randomStudent())
 
-        verify { statement.execute("CREATE TABLE IF NOT EXISTS Student (age INTEGER NOT NULL, firstName TEXT NOT NULL, height REAL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)") }
+        verify(statement).execute("CREATE TABLE IF NOT EXISTS Student (age INTEGER NOT NULL, firstName TEXT NOT NULL, height REAL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)")
 
         // Try with move complex values
         val encoder: Encoder<Discipline> = { ps, parameterIndex, x -> ps.setString(parameterIndex, x.toString())}
@@ -30,70 +31,75 @@ class KormTest {
         orm.addCoder(encoder, decoder, "TEXT")
         orm.createTable(randomStudentAdvanced())
 
-        verify { statement.execute("CREATE TABLE IF NOT EXISTS StudentAdvanced (age INTEGER NOT NULL, discipline TEXT NOT NULL, firstName TEXT NOT NULL, height REAL, isCurrent INTEGER NOT NULL, isFailing INTEGER NOT NULL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)") }
+        verify(statement).execute("CREATE TABLE IF NOT EXISTS StudentAdvanced (age INTEGER NOT NULL, discipline TEXT NOT NULL, firstName TEXT NOT NULL, height REAL, isCurrent INTEGER NOT NULL, isFailing INTEGER NOT NULL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)")
     }
 
     @Test
     fun delete() {
-        val conn = mockk<Connection>()
-        val statement = mockk<PreparedStatement>(relaxed = true)
-        val orm = spyk(Korm(conn = conn))
-        every { conn.prepareStatement(any()) } returns statement
+        val conn = mock(Connection::class.java)
+        val statement = mock(PreparedStatement::class.java)
+        val orm = Korm(conn = conn)
+        Mockito.`when`(conn.prepareStatement(any())).thenReturn(statement)
         orm.delete(Student::class, (Student::studentId eq 2) and (Student::age eq 12))
 
-        verify { conn.prepareStatement("DELETE FROM Student WHERE Student.studentId = ? AND Student.age = ?") }
+        verify(conn).prepareStatement("DELETE FROM Student WHERE Student.studentId = ? AND Student.age = ?")
     }
 
     @Test
     fun drop() {
-        val conn = mockk<Connection>()
-        val statement = mockk<Statement>(relaxed = true)
-        val orm = spyk(Korm(conn = conn))
-        every { conn.createStatement() } returns statement
+        val conn = mock(Connection::class.java)
+        val statement = mock(Statement::class.java)
+        val orm = Korm(conn = conn)
+        Mockito.`when`(conn.createStatement()).thenReturn(statement)
         orm.drop(Student::class)
 
-        verify { statement.executeUpdate("DROP TABLE IF EXISTS Student") }
+        verify(statement).executeUpdate("DROP TABLE IF EXISTS Student")
     }
 
     @Test
     fun find() {
-        val conn = mockk<Connection>()
-        val statement = mockk<PreparedStatement>(relaxed = true)
-        val orm = spyk(Korm(conn = conn))
-        every { conn.prepareStatement(any()) } returns statement
+        val conn = mock(Connection::class.java)
+        val statement = mock(PreparedStatement::class.java)
+        val resultSet = mock(ResultSet::class.java)
+        val orm = Korm(conn = conn)
+        Mockito.`when`(conn.prepareStatement(any())).thenReturn(statement)
+        Mockito.`when`(statement.executeQuery()).thenReturn(resultSet)
         orm.find(Student::class)
 
-        verify { conn.prepareStatement("SELECT * FROM Student") }
+        verify(conn).prepareStatement("SELECT * FROM Student")
 
         val conditions = (Student::firstName eq "Donald") and (Student::age lte 22)
         orm.find(Student::class, conditions)
 
-        verify { conn.prepareStatement("SELECT * FROM Student WHERE Student.firstName = ? AND Student.age <= ?") }
+        verify(conn).prepareStatement("SELECT * FROM Student WHERE Student.firstName = ? AND Student.age <= ?")
     }
 
     @Test
     fun insert() {
         val student = randomStudent()
-        val conn = mockk<Connection>()
-        val statement = mockk<PreparedStatement>(relaxed = true)
-        val orm = spyk(Korm(conn = conn))
-        every { conn.prepareStatement(any()) } returns statement
+        val conn = mock(Connection::class.java)
+        val statement = mock(PreparedStatement::class.java)
+        val resultSet = mock(ResultSet::class.java)
+        val orm = Korm(conn = conn)
+        Mockito.`when`(conn.prepareStatement(any())).thenReturn(statement)
+        Mockito.`when`(statement.generatedKeys).thenReturn(resultSet)
+        Mockito.`when`(resultSet.getInt("last_insert_rowid()")).thenReturn(1)
         orm.insert(student)
 
-        verify { conn.prepareStatement("INSERT INTO Student(age,firstName,height,maidenName,surname) VALUES(?,?,?,?,?)") }
+        verify(conn).prepareStatement("INSERT INTO Student(age,firstName,height,maidenName,surname) VALUES(?,?,?,?,?)")
     }
 
     @Test
     fun update() {
-        val conn = mockk<Connection>()
-        val statement = mockk<PreparedStatement>(relaxed = true)
-        val orm = spyk(Korm(conn = conn))
-        every { conn.prepareStatement(any()) } returns statement
+        val conn = mock(Connection::class.java)
+        val statement = mock(PreparedStatement::class.java)
+        val orm = Korm(conn = conn)
+        Mockito.`when`(conn.prepareStatement(any())).thenReturn(statement)
         val condition = (Student::age gt 99) and (Student::maidenName eq "Donald") and Student::height.isNull()
         val updater = (Student::age set 100) and (Student::maidenName set null) onCondition condition
         orm.update(Student::class, updater)
 
-        verify { conn.prepareStatement("UPDATE Student SET age = ?, maidenName = NULL WHERE Student.age > ? AND Student.maidenName = ? AND Student.height IS NULL") }
+        verify(conn).prepareStatement("UPDATE Student SET age = ?, maidenName = NULL WHERE Student.age > ? AND Student.maidenName = ? AND Student.height IS NULL")
     }
 
     @Test
