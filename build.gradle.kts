@@ -2,11 +2,12 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPluginWrapper
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
+    maven
     kotlin("jvm") version "1.2.71"
 }
 
 group = "com.github.igniparoustempest"
-version = "v0.2"
+version = "v0.2.1"
 
 val dataFactoryVersion = "0.8"
 val junit5Version = "5.3.1"
@@ -26,4 +27,10 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junit5Version")
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
     testImplementation("org.fluttercode.datafactory:datafactory:$dataFactoryVersion")
+}
+
+tasks {
+    "test"(Test::class) {
+        useJUnitPlatform()
+    }
 }
