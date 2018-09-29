@@ -1,5 +1,6 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.OrmHelper.Companion.fullyQualifiedName
 import kotlin.reflect.KProperty1
 
 class KormCondition(val sql: String, val values: List<Any>) {
@@ -11,18 +12,6 @@ class KormCondition(val sql: String, val values: List<Any>) {
         return KormCondition(this.sql + " OR " + other.sql, this.values + other.values)
     }
 }
-
-/**
- * Gets fully qualified name of a column.
- * Eg age => Student.age
- */
-fun <T, R: Any> fullyQualifiedName(property: KProperty1<T, R?>): String {
-    // TODO: Is there a better way to do this?
-    val tableName = property.toString().split(":").first().split(".").dropLast(1).last()
-    return tableName + "." + property.name
-}
-
-
 
 infix fun <T, R: Any> KProperty1<T, R?>.eq(value: R?): KormCondition {
     val columnName = fullyQualifiedName(this)

@@ -3,6 +3,7 @@ package com.github.igniparoustempest.korm
 import com.github.igniparoustempest.korm.testingtables.Discipline
 import com.github.igniparoustempest.korm.testingtables.Student
 import com.github.igniparoustempest.korm.testingtables.StudentAdvanced
+import com.github.igniparoustempest.korm.types.PrimaryKey
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.spyk
@@ -31,6 +32,19 @@ class KormTest {
         orm.createTable(randomStudentAdvanced())
 
         verify { statement.execute("CREATE TABLE IF NOT EXISTS StudentAdvanced (age INTEGER NOT NULL, discipline TEXT NOT NULL, firstName TEXT NOT NULL, height REAL, isCurrent INTEGER NOT NULL, isFailing INTEGER NOT NULL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)") }
+    }
+
+    @Test
+    fun createTableForeignKey() {
+        val conn = mockk<Connection>()
+        val statement = mockk<PreparedStatement>(relaxed = true)
+        val orm = spyk(Korm(conn = conn))
+        every { conn.prepareStatement(any()) } returns statement
+        orm.createTable(randomDepartment())
+        orm.createTable(randomStudentFK(PrimaryKey(9001)))
+
+        verify { conn.prepareStatement("CREATE TABLE IF NOT EXISTS Department (departmentId INTEGER PRIMARY KEY NOT NULL, name TEXT NOT NULL)") }
+        verify { conn.prepareStatement("CREATE TABLE IF NOT EXISTS Student (departmentId INTEGER REFERENCES Department(departmentId) ON UPDATE CASCADE, name TEXT NOT NULL, studentId INTEGER PRIMARY KEY NOT NULL)") }
     }
 
     @Test

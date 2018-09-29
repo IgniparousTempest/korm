@@ -1,6 +1,7 @@
 package com.github.igniparoustempest.korm
 
 import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
+import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKey
 import java.sql.Connection
 import java.sql.DriverManager
@@ -224,6 +225,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
             when (type) {
                 Boolean::class.createType() -> pstmt.setBool(index, data as Boolean?)
                 Float::class.createType() -> pstmt.setFloating(index, data as Float?)
+                ForeignKey::class.createType() -> pstmt.setInteger(index, (data as ForeignKey).value)
                 Int::class.createType() -> pstmt.setInteger(index, data as Int?)
                 PrimaryKey::class.createType() -> pstmt.setInteger(index, (data as PrimaryKey).value)
                 String::class.createType() -> pstmt.setString(index, data as String?)
@@ -238,6 +240,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
             when (type) {
                 Boolean::class.createType() -> rs.getBool(columnName)
                 Float::class.createType() -> rs.getFloating(columnName)
+                ForeignKey::class.createType() -> ForeignKey((type. as ForeignKey).foreignName, (type as ForeignKey).foreignFullyQualifiedName, rs.getInt(columnName))
                 Int::class.createType() -> rs.getInteger(columnName)
                 PrimaryKey::class.createType() -> PrimaryKey(rs.getInteger(columnName))
                 String::class.createType() -> rs.getString(columnName)
