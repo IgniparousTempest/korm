@@ -14,11 +14,11 @@ allprojects {
 }
 
 dependencies {
-    implementation("com.github.IgniparousTempest:korm:v0.3.0")
+    implementation("com.github.IgniparousTempest:korm:v0.3.1")
 }
 ```
 
-See [Jitpack.io](https://jitpack.io/#IgniparousTempest/korm/v0.3.0) for including this library with different frameworks or for different versions.
+See [Jitpack.io](https://jitpack.io/#IgniparousTempest/korm/v0.3.1) for including this library with different frameworks or for different versions.
 
 ## Create a new database
 
