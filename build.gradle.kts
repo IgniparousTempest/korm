@@ -2,13 +2,18 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPluginWrapper
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
+    maven
     kotlin("jvm") version "1.2.71"
 }
 
 group = "com.github.igniparoustempest"
-version = "v0.1"
+version = "v0.2.1"
 
+val dataFactoryVersion = "0.8"
+val junit5Version = "5.3.1"
 val kotlinVersion = plugins.getPlugin(KotlinPluginWrapper::class.java).kotlinPluginVersion
+val mockitoVersion = "2.22.0"
+val sqliteVersion = "3.23.1"
 
 
 repositories {
@@ -17,9 +22,15 @@ repositories {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
-    implementation("org.xerial:sqlite-jdbc:3.23.1")
+    implementation("org.xerial:sqlite-jdbc:$sqliteVersion")
     testImplementation("org.jetbrains.kotlin:kotlin-test:$kotlinVersion")
-    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.3.1")
-    testImplementation("io.mockk:mockk:1.8.7")
-    testImplementation("org.fluttercode.datafactory:datafactory:0.8")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:$junit5Version")
+    testImplementation("org.mockito:mockito-core:$mockitoVersion")
+    testImplementation("org.fluttercode.datafactory:datafactory:$dataFactoryVersion")
+}
+
+tasks {
+    "test"(Test::class) {
+        useJUnitPlatform()
+    }
 }
