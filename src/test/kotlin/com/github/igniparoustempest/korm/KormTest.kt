@@ -12,6 +12,7 @@ import org.mockito.Mockito
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.sqlite.SQLiteException
+import java.nio.file.Paths
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -168,6 +169,22 @@ class KormTest {
         // Run tests
         assertEquals(10, beforeDrop.size)
         assertEquals(0, afterDrop.size, "Should drop table safely")
+        orm.close()
+    }
+
+    @Test
+    fun integrationFile() {
+        val path = Paths.get(createTempDir().path, "test.db").toAbsolutePath().toString()
+        val orm = Korm(path)
+
+        // Save data
+        val students = (1..10).map { orm.insert(randomStudent()) }
+
+        // Retrieve data
+        val retrievedStudents = orm.find(Student::class)
+
+        // Run tests
+        assertEquals(students, retrievedStudents, "Should work from a file database")
         orm.close()
     }
 
