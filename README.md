@@ -14,7 +14,7 @@ allprojects {
 }
 
 dependencies {
-    implementation("com.github.IgniparousTempest:korm:v0.2.1")
+    implementation("com.github.IgniparousTempest:korm:v0.3.0")
 }
 ```
 
@@ -115,4 +115,21 @@ data class Student (
 val encoder: Encoder<Discipline> = { ps, parameterIndex, x -> ps.setString(parameterIndex, x.toString())}
 val decoder: Decoder<Discipline> = { rs, columnLabel -> Discipline.fromString(rs.getString(columnLabel))}
 orm.addCoder(encoder, decoder, "TEXT")
+```
+
+## Foreign Keys
+
+```kotlin
+data class Dog(
+    val dogId: PrimaryKey,
+    val name: String,
+    val ownerId: ForeignKey
+)
+
+val student = orm.insert(Student(/* Set parameters */))
+
+val dog = orm.insert(Dog(
+    name = "Baggins", 
+    ownerId = ForeignKey(Student::studentId, student.studentId)
+))
 ```

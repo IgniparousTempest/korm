@@ -46,6 +46,10 @@ class Korm(path: String? = null, conn: Connection? = null) {
                         PrimaryKey::class.createType() -> "INTEGER PRIMARY KEY"
                         Boolean::class.createType() -> "INTEGER"
                         Float::class.createType() -> "REAL"
+                        ForeignKey::class.createType() -> {
+                            val fk = readProperty(row, it.name) as ForeignKey
+                            "INTEGER REFERENCES ${fk.foreignTableName}(${fk.foreignColumnName}) ON UPDATE CASCADE"
+                        }
                         Int::class.createType() -> "INTEGER"
                         String::class.createType() -> "TEXT"
                         else -> throw UnsupportedDataTypeException("Invalid data type ${it.returnType}.")
@@ -240,7 +244,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
             when (type) {
                 Boolean::class.createType() -> rs.getBool(columnName)
                 Float::class.createType() -> rs.getFloating(columnName)
-                ForeignKey::class.createType() -> ForeignKey((type. as ForeignKey).foreignName, (type as ForeignKey).foreignFullyQualifiedName, rs.getInt(columnName))
+                ForeignKey::class.createType() -> ForeignKey(null, null, rs.getInt(columnName))
                 Int::class.createType() -> rs.getInteger(columnName)
                 PrimaryKey::class.createType() -> PrimaryKey(rs.getInteger(columnName))
                 String::class.createType() -> rs.getString(columnName)

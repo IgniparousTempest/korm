@@ -46,6 +46,6 @@ fun randomStudentFK(departmentId: PrimaryKey): StudentFK {
     val df = DataFactory()
     return StudentFK(
             name = df.firstName,
-            departmentId = ForeignKey(Department::departmentId, departmentId.value!!)
+            departmentId = ForeignKey(Department::departmentId, departmentId)
     )
 }
