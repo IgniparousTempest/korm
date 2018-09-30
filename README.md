@@ -4,7 +4,7 @@ A super simple Kotlin ORM. It uses prepared statements for everything and is the
 
 ## Usage
 
-##### Gradle
+##### Gradle Kotlin DSL
 
 ```gradle
 allprojects {
@@ -17,6 +17,8 @@ dependencies {
     implementation("com.github.IgniparousTempest:korm:v0.3.0")
 }
 ```
+
+See [Jitpack.io](https://jitpack.io/#IgniparousTempest/korm/v0.3.0) for including this library with different frameworks or for different versions.
 
 ## Create a new database
 
