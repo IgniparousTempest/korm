@@ -1,5 +1,6 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.testingtables.Department
 import com.github.igniparoustempest.korm.testingtables.Discipline
 import com.github.igniparoustempest.korm.testingtables.Student
 import com.github.igniparoustempest.korm.testingtables.StudentAdvanced
@@ -10,11 +11,13 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.sqlite.SQLiteException
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Statement
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class KormTest {
     @Test
@@ -203,6 +206,10 @@ class KormTest {
         // Run tests
         assertEquals(students.map { it.departmentId.value }, retrievedStudents.map { it.departmentId.value }, "Should preserve foreign key")
         assertEquals(3, studentsInDepartment0.size, "Should search on foreign key")
+        // This might fail if SQLite is compiled without foreign key support
+        assertFailsWith<SQLiteException>("[SQLITE_CONSTRAINT_FOREIGNKEY]  A foreign key constraint failed (FOREIGN KEY constraint failed)") {
+            orm.delete(Department::class, Department::departmentId eq 2)
+        }
         orm.close()
     }
 

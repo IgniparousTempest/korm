@@ -21,12 +21,9 @@ import kotlin.reflect.jvm.isAccessible
 import kotlin.reflect.jvm.reflect
 
 
-class Korm(path: String? = null, conn: Connection? = null) {
-    private val conn: Connection = when {
-        conn != null -> conn
-        path == null -> DriverManager.getConnection("jdbc:sqlite::memory:")
-        else -> DriverManager.getConnection("jdbc:sqlite:$path")
-    }
+class Korm(private val conn: Connection) {
+    constructor(): this(DriverManager.getConnection("jdbc:sqlite::memory:", KormConfig().toProperties()))
+    constructor(path: String): this(DriverManager.getConnection("jdbc:sqlite:$path", KormConfig().toProperties()))
     private val coders = mutableMapOf<KType, Coder<Any>>()
 
     /**
