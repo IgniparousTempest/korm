@@ -49,6 +49,16 @@ infix fun <T, R: Any> KProperty1<T, R?>.gte(value: R): KormCondition {
     return KormCondition("$columnName >= ?", listOf(value))
 }
 
+infix fun <T> KProperty1<T, String?>.like(value: String): KormCondition {
+    val columnName = fullyQualifiedName(this)
+    return KormCondition("$columnName LIKE ?", listOf(value))
+}
+
+infix fun <T> KProperty1<T, String?>.glob(value: String): KormCondition {
+    val columnName = fullyQualifiedName(this)
+    return KormCondition("$columnName GLOB ?", listOf(value))
+}
+
 infix fun <T, R: Any> KProperty1<T, R?>.between(values: Pair<R, R>): KormCondition {
     val columnName = fullyQualifiedName(this)
     return KormCondition("$columnName BETWEEN ? AND ?", listOf(values.first, values.second))
