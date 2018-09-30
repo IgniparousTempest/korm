@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.github.igniparoustempest"
-version = "v0.2.1"
+version = "v0.3.0"
 
 val dataFactoryVersion = "0.8"
 val junit5Version = "5.3.1"

@@ -1,6 +1,7 @@
 package com.github.igniparoustempest.korm
 
 import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
+import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKey
 import java.sql.Connection
 import java.sql.DriverManager
@@ -20,12 +21,9 @@ import kotlin.reflect.jvm.isAccessible
 import kotlin.reflect.jvm.reflect
 
 
-class Korm(path: String? = null, conn: Connection? = null) {
-    private val conn: Connection = when {
-        conn != null -> conn
-        path == null -> DriverManager.getConnection("jdbc:sqlite::memory:")
-        else -> DriverManager.getConnection("jdbc:sqlite:$path")
-    }
+class Korm(private val conn: Connection) {
+    constructor(): this(DriverManager.getConnection("jdbc:sqlite::memory:", KormConfig().toProperties()))
+    constructor(path: String): this(DriverManager.getConnection("jdbc:sqlite:$path", KormConfig().toProperties()))
     private val coders = mutableMapOf<KType, Coder<Any>>()
 
     /**
@@ -45,6 +43,10 @@ class Korm(path: String? = null, conn: Connection? = null) {
                         PrimaryKey::class.createType() -> "INTEGER PRIMARY KEY"
                         Boolean::class.createType() -> "INTEGER"
                         Float::class.createType() -> "REAL"
+                        ForeignKey::class.createType() -> {
+                            val fk = readProperty(row, it.name) as ForeignKey
+                            "INTEGER REFERENCES ${fk.foreignTableName}(${fk.foreignColumnName}) ON UPDATE CASCADE"
+                        }
                         Int::class.createType() -> "INTEGER"
                         String::class.createType() -> "TEXT"
                         else -> throw UnsupportedDataTypeException("Invalid data type ${it.returnType}.")
@@ -224,6 +226,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
             when (type) {
                 Boolean::class.createType() -> pstmt.setBool(index, data as Boolean?)
                 Float::class.createType() -> pstmt.setFloating(index, data as Float?)
+                ForeignKey::class.createType() -> pstmt.setInteger(index, (data as ForeignKey).value)
                 Int::class.createType() -> pstmt.setInteger(index, data as Int?)
                 PrimaryKey::class.createType() -> pstmt.setInteger(index, (data as PrimaryKey).value)
                 String::class.createType() -> pstmt.setString(index, data as String?)
@@ -238,6 +241,7 @@ class Korm(path: String? = null, conn: Connection? = null) {
             when (type) {
                 Boolean::class.createType() -> rs.getBool(columnName)
                 Float::class.createType() -> rs.getFloating(columnName)
+                ForeignKey::class.createType() -> ForeignKey(null, null, rs.getInt(columnName))
                 Int::class.createType() -> rs.getInteger(columnName)
                 PrimaryKey::class.createType() -> PrimaryKey(rs.getInteger(columnName))
                 String::class.createType() -> rs.getString(columnName)

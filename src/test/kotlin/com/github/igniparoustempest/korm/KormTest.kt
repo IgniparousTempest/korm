@@ -1,18 +1,23 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.testingtables.Department
 import com.github.igniparoustempest.korm.testingtables.Discipline
 import com.github.igniparoustempest.korm.testingtables.Student
 import com.github.igniparoustempest.korm.testingtables.StudentAdvanced
+import com.github.igniparoustempest.korm.testingtables.StudentFK
+import com.github.igniparoustempest.korm.types.PrimaryKey
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.sqlite.SQLiteException
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Statement
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class KormTest {
     @Test
@@ -24,14 +29,36 @@ class KormTest {
         orm.createTable(randomStudent())
 
         verify(statement).execute("CREATE TABLE IF NOT EXISTS Student (age INTEGER NOT NULL, firstName TEXT NOT NULL, height REAL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)")
+    }
 
-        // Try with move complex values
+    @Test
+    fun createTableCustomEncoder() {
+        val conn = mock(Connection::class.java)
+        val statement = mock(PreparedStatement::class.java)
+        val orm = Korm(conn = conn)
+        Mockito.`when`(conn.createStatement()).thenReturn(statement)
+
+        // Custom encoder/decoder
         val encoder: Encoder<Discipline> = { ps, parameterIndex, x -> ps.setString(parameterIndex, x.toString())}
         val decoder: Decoder<Discipline> = { rs, columnLabel -> Discipline.fromString(rs.getString(columnLabel))}
         orm.addCoder(encoder, decoder, "TEXT")
+
         orm.createTable(randomStudentAdvanced())
 
         verify(statement).execute("CREATE TABLE IF NOT EXISTS StudentAdvanced (age INTEGER NOT NULL, discipline TEXT NOT NULL, firstName TEXT NOT NULL, height REAL, isCurrent INTEGER NOT NULL, isFailing INTEGER NOT NULL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)")
+    }
+
+    @Test
+    fun createTableForeignKey() {
+        val conn = mock(Connection::class.java)
+        val statement = mock(PreparedStatement::class.java)
+        val orm = Korm(conn = conn)
+        Mockito.`when`(conn.createStatement()).thenReturn(statement)
+        orm.createTable(randomDepartment())
+        orm.createTable(randomStudentFK(PrimaryKey(9001)))
+
+        verify(statement).execute("CREATE TABLE IF NOT EXISTS Department (departmentId INTEGER PRIMARY KEY NOT NULL, name TEXT NOT NULL)")
+        verify(statement).execute("CREATE TABLE IF NOT EXISTS StudentFK (departmentId INTEGER REFERENCES Department(departmentId) ON UPDATE CASCADE NOT NULL, name TEXT NOT NULL, studentId INTEGER PRIMARY KEY NOT NULL)")
     }
 
     @Test
@@ -161,6 +188,28 @@ class KormTest {
 
         // Run tests
         assertEquals(4, retrievedStudents.size, "Should work with complex conditions")
+        orm.close()
+    }
+
+    @Test
+    fun integrationForeignKey() {
+        val orm = Korm()
+
+        // Save data
+        val departments = (1..4).map { orm.insert(randomDepartment()) }
+        val students = (1..12).mapIndexed { i, _ -> orm.insert(randomStudentFK(departments[i % departments.size].departmentId)) }
+
+        // Retrieve data
+        val retrievedStudents = orm.find(StudentFK::class)
+        val studentsInDepartment0 = orm.find(StudentFK::class, StudentFK::departmentId eq departments[0].departmentId)
+
+        // Run tests
+        assertEquals(students.map { it.departmentId.value }, retrievedStudents.map { it.departmentId.value }, "Should preserve foreign key")
+        assertEquals(3, studentsInDepartment0.size, "Should search on foreign key")
+        // This might fail if SQLite is compiled without foreign key support
+        assertFailsWith<SQLiteException>("[SQLITE_CONSTRAINT_FOREIGNKEY]  A foreign key constraint failed (FOREIGN KEY constraint failed)") {
+            orm.delete(Department::class, Department::departmentId eq 2)
+        }
         orm.close()
     }
 
