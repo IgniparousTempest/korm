@@ -137,7 +137,7 @@ class KormTest {
         val orm = Korm()
 
         //Insert data
-        val students = (1..10).map { orm.insert(randomStudent()) }
+        (1..10).map { orm.insert(randomStudent()) }
 
         assertFailsWith<DatabaseException> {
             orm.find(Student::class, KormCondition("sdfgsd = ?", listOf(3)))

@@ -53,18 +53,20 @@ tasks {
         add("archives", javadocJar)
     }
 
-    // Task with name 'codeCoverageReport' not found in root project ''.
-    "codeCoverageReport"(JacocoReport::class) {
+    val codeCoverageReport by creating(JacocoReport::class) {
         executionData(fileTree(project.rootDir.absolutePath).include("**/build/jacoco/*.exec"))
 
         subprojects.onEach {
-            sourceSets(it.sourceSets.main)
+            sourceSets(it.sourceSets["main"])
         }
 
         reports {
+            sourceDirectories =  files(sourceSets["main"].allSource.srcDirs)
+            classDirectories =  files(sourceSets["main"].output)
             xml.isEnabled = true
             xml.destination = File("$buildDir/reports/jacoco/report.xml")
-            html.isEnabled = false
+            classDirectories = files(classDirectories.files)
+            html.isEnabled = true
             csv.isEnabled = false
         }
 
