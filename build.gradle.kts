@@ -2,8 +2,9 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPluginWrapper
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    maven
     kotlin("jvm") version "1.2.71"
+    jacoco
+    maven
 }
 
 group = "com.github.igniparoustempest"
@@ -27,6 +28,15 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junit5Version")
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
     testImplementation("org.fluttercode.datafactory:datafactory:$dataFactoryVersion")
+}
+
+tasks.withType<JacocoReport> {
+    reports {
+        xml.isEnabled = true
+        html.isEnabled = true
+    }
+    val jacocoTestReport by tasks
+    jacocoTestReport.dependsOn("test")
 }
 
 tasks {
