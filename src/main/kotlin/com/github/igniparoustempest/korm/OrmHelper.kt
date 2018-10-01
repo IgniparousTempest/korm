@@ -9,7 +9,12 @@ class OrmHelper {
          */
         fun <T, R: Any> tableName(property: KProperty1<T, R?>): String {
             // TODO: Is there a better way to do this?
-            return property.toString().split(":").first().split(".").dropLast(1).last()
+            val fullyQualifiedClass = property.toString().split(":").first()
+            val className = fullyQualifiedClass.split(".").dropLast(1).last().split( " ").last()
+            if (!className.contains("$"))
+                return className
+            val unescapedClassName = className.drop(1).dropLast(1)
+            return unescapedClassName.split("$").last()
         }
 
         /**
