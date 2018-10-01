@@ -65,7 +65,6 @@ tasks {
             classDirectories =  files(sourceSets["main"].output)
             xml.isEnabled = true
             xml.destination = File("$buildDir/reports/jacoco/report.xml")
-            classDirectories = files(classDirectories.files)
             html.isEnabled = true
             csv.isEnabled = false
         }
