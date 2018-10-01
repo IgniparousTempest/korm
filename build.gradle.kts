@@ -2,12 +2,13 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPluginWrapper
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
+    java
     maven
     kotlin("jvm") version "1.2.71"
 }
 
 group = "com.github.igniparoustempest"
-version = "v0.3.1"
+version = "v0.4.0"
 
 val dataFactoryVersion = "0.8"
 val junit5Version = "5.3.1"
@@ -32,5 +33,22 @@ dependencies {
 tasks {
     "test"(Test::class) {
         useJUnitPlatform()
+    }
+
+    val sourcesJar by creating(Jar::class) {
+        dependsOn(JavaPlugin.CLASSES_TASK_NAME)
+        classifier = "sources"
+        from(sourceSets["main"].allSource)
+    }
+
+    val javadocJar by creating(Jar::class) {
+        dependsOn(JavaPlugin.JAVADOC_TASK_NAME)
+        classifier = "javadoc"
+        from(tasks["javadoc"])
+    }
+
+    artifacts {
+        add("archives", sourcesJar)
+        add("archives", javadocJar)
     }
 }
