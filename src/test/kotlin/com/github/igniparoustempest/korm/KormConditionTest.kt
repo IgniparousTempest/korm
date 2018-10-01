@@ -1,5 +1,6 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.conditions.*
 import com.github.igniparoustempest.korm.testingtables.Dog
 import com.github.igniparoustempest.korm.testingtables.Student
 import org.junit.jupiter.api.Test
@@ -135,7 +136,7 @@ class KormConditionTest {
                 ),
                 Dog(
                         name = "Shenzi",
-                        yearOfBirsth = 2004,
+                        yearOfBirsth = 2005,
                         breed = "Golden Retriever"
                 ),
                 Dog(
@@ -153,7 +154,7 @@ class KormConditionTest {
     assertEquals(dogs.drop(3), orm.find(Dog::class, Dog::yearOfBirsth gte 2000), ">=")
     assertEquals(listOf(dogs[4]), orm.find(Dog::class, Dog::name like "Bag_i%"), "LIKE")
     assertEquals(listOf(dogs[4]), orm.find(Dog::class, Dog::name glob "Bag?i*"), "GLOB")
-    assertEquals(dogs.drop(3).dropLast(1), orm.find(Dog::class, Dog::yearOfBirsth between Pair(2000, 2004)), "BETWEEN")
+    assertEquals(dogs.drop(3).dropLast(1), orm.find(Dog::class, Dog::yearOfBirsth between Pair(2000, 2005)), "BETWEEN")
     assertEquals(dogs, orm.find(Dog::class, Dog::yearOfBirsth.notNull()), "NOT NULL")
     assertEquals(emptyList(), orm.find(Dog::class, Dog::name.isNull()), "IS NULL")
     assertEquals(listOf(dogs[4]), orm.find(Dog::class, Dog::name glob "B*" and (Dog::breed eq "Jack-Russel")), "AND")

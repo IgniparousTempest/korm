@@ -1,5 +1,6 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.exceptions.DatabaseException
 import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
 import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKey
@@ -24,11 +25,12 @@ import kotlin.reflect.jvm.reflect
 class Korm(private val conn: Connection) {
     constructor(): this(DriverManager.getConnection("jdbc:sqlite::memory:", KormConfig().toProperties()))
     constructor(path: String): this(DriverManager.getConnection("jdbc:sqlite:$path", KormConfig().toProperties()))
-    private val coders = mutableMapOf<KType, Coder<Any>>()
+    private val coders = mutableMapOf<KType, KormCoder<Any>>()
 
     /**
      * Creates a table based on a row that will be inserted into it.
      * There is no need to call this as inserting calls this automatically.
+     * @throws DatabaseException If the underlying database throws an error that can't be handled here.
      * @throws UnsupportedDataTypeException If the row class contains a member with an unsupported data type.
      */
     fun <T: Any> createTable(row: T) {
@@ -63,12 +65,13 @@ class Korm(private val conn: Connection) {
             stmt.execute(sql)
             stmt.close()
         } catch (e: SQLException) {
-            throw e
+            throw DatabaseException("An impassable error occurred while trying to create table.", e, sql)
         }
     }
 
     /**
      * Deletes rows in the table that match the specified condition.
+     * @throws DatabaseException If the underlying database throws an error that can't be handled here.
      */
     fun <T: Any> delete(clazz: KClass<T>, condition: KormCondition) {
         val tableName = clazz.simpleName
@@ -87,12 +90,13 @@ class Korm(private val conn: Connection) {
                 return
             }
             else
-                throw e
+                throw DatabaseException("An impassable error occurred while trying to delete rows.", e, sql)
         }
     }
 
     /**
      * Drops the specified table.
+     * @throws DatabaseException If the underlying database throws an error that can't be handled here.
      */
     fun <T: Any> drop(clazz: KClass<T>) {
         val tableName = clazz.simpleName
@@ -102,12 +106,14 @@ class Korm(private val conn: Connection) {
             stmt.executeUpdate(sql)
             stmt.close()
         } catch (e: SQLException) {
-            throw e
+            throw DatabaseException("An impassable error occurred while trying to drop table.", e, sql)
         }
     }
 
     /**
      * Gets all rows from a table that match the specified condition.
+     * If the table doesn't exist it returns an empty list.
+     * @throws DatabaseException If the underlying database throws an error that can't be handled here.
      * @throws UnsupportedDataTypeException If the T class contains a member with an unsupported data type.
      */
     fun <T: Any> find(clazz: KClass<T>, condition: KormCondition? = null): List<T> {
@@ -140,7 +146,7 @@ class Korm(private val conn: Connection) {
             if (e.message == "[SQLITE_ERROR] SQL error or missing database (no such table: $tableString)")
                 return emptyList()
             else
-                throw e
+                throw DatabaseException("An impassable error occurred while trying to find rows.", e, sql)
         }
 
         return results
@@ -148,6 +154,7 @@ class Korm(private val conn: Connection) {
 
     /**
      * Inserts a row into the table.
+     * @throws DatabaseException If the underlying database throws an error that can't be handled here.
      * @throws UnsupportedDataTypeException If the row class contains a member with an unsupported data type.
      */
     fun <T: Any> insert(row: T): T {
@@ -179,12 +186,13 @@ class Korm(private val conn: Connection) {
                 return insert(row)
             }
             else
-                throw e
+                throw DatabaseException("An impassable error occurred while trying to insert a row.", e, sql)
         }
     }
 
     /**
      * Updates a row based on the specified conditions.
+     * @throws DatabaseException If the underlying database throws an error that can't be handled here.
      * @throws UnsupportedDataTypeException If the class contains a member with an unsupported data type.
      */
     fun <T: Any> update(clazz: KClass<T>, updater: KormUpdater) {
@@ -206,7 +214,7 @@ class Korm(private val conn: Connection) {
             if (e.message == "[SQLITE_ERROR] SQL error or missing database (no such table: $tableName)")
                 return
             else
-                throw e
+                throw DatabaseException("An impassable error occurred while trying to update the table.", e, sql)
         }
     }
 
@@ -214,9 +222,15 @@ class Korm(private val conn: Connection) {
         conn.close()
     }
 
-    fun <T: Any> addCoder(encoder: Encoder<T>, decoder: Decoder<T>, dataType: String) {
+    /**
+     * Adds a new coder to the ORM to handle custom data types, or overwrite default behaviour.
+     */
+    fun <T: Any> addCoder(coder: KormCoder<T>) {
         @Suppress("UNCHECKED_CAST")
-        coders[decoder.reflect()!!.returnType] = Coder(encoder, decoder, dataType) as Coder<Any>
+        coders[coder.decoder.reflect()!!.returnType] = coder as KormCoder<Any>
+    }
+    fun <T: Any> addCoder(encoder: Encoder<T>, decoder: Decoder<T>, dataType: String) {
+        addCoder(KormCoder(encoder, decoder, dataType))
     }
 
     private fun <T: Any> applyEncoder(type: KType, pstmt: PreparedStatement, index: Int, data: T?) {
@@ -279,6 +293,7 @@ class Korm(private val conn: Connection) {
     private fun <T: Any> columnNames(row: T) = columnNames(row::class)
     private fun <T: KClass<*>> columnNames(clazz: T): List<KProperty1<out String, Any?>> {
         val parametersNames = clazz.primaryConstructor!!.parameters.map { it.name }
+        @Suppress("UNCHECKED_CAST")
         return clazz.declaredMemberProperties.filter { parametersNames.contains(it.name) } as List<KProperty1<out String, Any?>>
     }
 

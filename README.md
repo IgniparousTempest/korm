@@ -16,11 +16,11 @@ allprojects {
 }
 
 dependencies {
-    implementation("com.github.IgniparousTempest:korm:v0.3.1")
+    implementation("com.github.IgniparousTempest:korm:v0.4.1")
 }
 ```
 
-See [Jitpack.io](https://jitpack.io/#IgniparousTempest/korm/v0.3.1) for including this library with different frameworks or for different versions.
+See [Jitpack.io](https://jitpack.io/#IgniparousTempest/korm/v0.4.1) for including this library with different frameworks or for different versions.
 
 ## Create a new database
 
@@ -103,7 +103,7 @@ data class Degree(val name: String, val year: Int) {
     }
 
     companion object {
-        fun fromString(str: String): Discipline {
+        fun fromString(str: String): Degree {
             val params = str.split(",")
             return Degree(params.dropLast(1).joinToString(""), params.last().toInt())
         }
@@ -116,9 +116,11 @@ data class Student (
     val degree: Degree
 )
 
-val encoder: Encoder<Discipline> = { ps, parameterIndex, x -> ps.setString(parameterIndex, x.toString())}
-val decoder: Decoder<Discipline> = { rs, columnLabel -> Discipline.fromString(rs.getString(columnLabel))}
-orm.addCoder(encoder, decoder, "TEXT")
+orm.addCoder(KormCoder(
+    encoder = { ps, parameterIndex, x -> ps.setString(parameterIndex, x.toString())},
+    decoder = { rs, columnLabel -> Degree.fromString(rs.getString(columnLabel))},
+    dataType = "TEXT"
+))
 ```
 
 ## Foreign Keys

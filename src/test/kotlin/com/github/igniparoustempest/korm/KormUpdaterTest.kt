@@ -1,6 +1,8 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.conditions.*
 import com.github.igniparoustempest.korm.testingtables.Student
+import com.github.igniparoustempest.korm.updates.*
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
