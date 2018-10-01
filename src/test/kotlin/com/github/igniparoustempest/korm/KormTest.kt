@@ -269,6 +269,24 @@ class KormTest {
         orm.close()
     }
 
+    /**
+     * Nesting a data class in a function changes its class name.
+     */
+    @Test
+    fun integrationLocalClass() {
+        data class Local(val localId: PrimaryKey = PrimaryKey(), val name: String)
+
+        val orm = Korm()
+
+        // Save data
+        val rows = ('a'..'z').map { orm.insert(Local(name = it.toString())) }
+
+        // Run tests
+        assertEquals(rows, orm.find(Local::class), "Should retrieve all rows.")
+        assertEquals(listOf(rows[0]), orm.find(Local::class, Local::name eq "a"), "Should retrieve with condition.")
+        orm.close()
+    }
+
     @Test
     fun integrationUpdate() {
         var students = (1..12).map { randomStudent() }
