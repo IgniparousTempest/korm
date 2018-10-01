@@ -30,15 +30,6 @@ dependencies {
     testImplementation("org.fluttercode.datafactory:datafactory:$dataFactoryVersion")
 }
 
-tasks.withType<JacocoReport> {
-    reports {
-        xml.isEnabled = true
-        html.isEnabled = true
-    }
-    val jacocoTestReport by tasks
-    jacocoTestReport.dependsOn("test")
-}
-
 tasks {
     "test"(Test::class) {
         useJUnitPlatform()
