@@ -287,6 +287,7 @@ class Korm(private val conn: Connection) {
     private fun <T: Any> columnNames(row: T) = columnNames(row::class)
     private fun <T: KClass<*>> columnNames(clazz: T): List<KProperty1<out String, Any?>> {
         val parametersNames = clazz.primaryConstructor!!.parameters.map { it.name }
+        @Suppress("UNCHECKED_CAST")
         return clazz.declaredMemberProperties.filter { parametersNames.contains(it.name) } as List<KProperty1<out String, Any?>>
     }
 

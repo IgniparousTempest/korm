@@ -1,5 +1,6 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.conditions.*
 import com.github.igniparoustempest.korm.testingtables.Dog
 import com.github.igniparoustempest.korm.testingtables.Student
 import org.junit.jupiter.api.Test
