@@ -6,14 +6,12 @@ import com.github.igniparoustempest.korm.testingtables.Discipline
 import com.github.igniparoustempest.korm.testingtables.Student
 import com.github.igniparoustempest.korm.testingtables.StudentAdvanced
 import com.github.igniparoustempest.korm.testingtables.StudentFK
-import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKey
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
-import org.sqlite.SQLiteException
 import java.nio.file.Paths
 import java.sql.Connection
 import java.sql.PreparedStatement
