@@ -1,5 +1,6 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.conditions.*
 import com.github.igniparoustempest.korm.exceptions.DatabaseException
 import com.github.igniparoustempest.korm.testingtables.Department
 import com.github.igniparoustempest.korm.testingtables.Discipline
@@ -7,6 +8,7 @@ import com.github.igniparoustempest.korm.testingtables.Student
 import com.github.igniparoustempest.korm.testingtables.StudentAdvanced
 import com.github.igniparoustempest.korm.testingtables.StudentFK
 import com.github.igniparoustempest.korm.types.PrimaryKey
+import com.github.igniparoustempest.korm.updates.*
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
