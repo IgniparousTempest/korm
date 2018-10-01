@@ -1,10 +1,12 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.exceptions.DatabaseException
 import com.github.igniparoustempest.korm.testingtables.Department
 import com.github.igniparoustempest.korm.testingtables.Discipline
 import com.github.igniparoustempest.korm.testingtables.Student
 import com.github.igniparoustempest.korm.testingtables.StudentAdvanced
 import com.github.igniparoustempest.korm.testingtables.StudentFK
+import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKey
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
@@ -131,6 +133,18 @@ class KormTest {
     }
 
     @Test
+    fun integrationDatabaseException() {
+        val orm = Korm()
+
+        //Insert data
+        val students = (1..10).map { orm.insert(randomStudent()) }
+
+        assertFailsWith<DatabaseException> {
+            orm.find(Student::class, KormCondition("sdfgsd = ?", listOf(3)))
+        }
+    }
+
+    @Test
     fun integrationDelete() {
         var students = (1..10).map { randomStudent() }
 
@@ -205,6 +219,8 @@ class KormTest {
 
         // Run tests
         assertEquals(4, retrievedStudents.size, "Should work with complex conditions")
+        assertEquals(emptyList(), orm.find(Student::class, Student::age eq -999), "Should not fail when there aren't rows")
+        assertEquals(emptyList(), orm.find(StudentFK::class), "Should not fail on a table that doesn't exist")
         orm.close()
     }
 
@@ -224,7 +240,7 @@ class KormTest {
         assertEquals(students.map { it.departmentId.value }, retrievedStudents.map { it.departmentId.value }, "Should preserve foreign key")
         assertEquals(3, studentsInDepartment0.size, "Should search on foreign key")
         // This might fail if SQLite is compiled without foreign key support
-        assertFailsWith<SQLiteException>("[SQLITE_CONSTRAINT_FOREIGNKEY]  A foreign key constraint failed (FOREIGN KEY constraint failed)") {
+        assertFailsWith<DatabaseException>("An impassable error occurred while trying to delete rows.") {
             orm.delete(Department::class, Department::departmentId eq 2)
         }
         orm.close()
