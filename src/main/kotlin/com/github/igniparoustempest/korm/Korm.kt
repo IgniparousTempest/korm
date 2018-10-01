@@ -25,7 +25,7 @@ import kotlin.reflect.jvm.reflect
 class Korm(private val conn: Connection) {
     constructor(): this(DriverManager.getConnection("jdbc:sqlite::memory:", KormConfig().toProperties()))
     constructor(path: String): this(DriverManager.getConnection("jdbc:sqlite:$path", KormConfig().toProperties()))
-    private val coders = mutableMapOf<KType, Coder<Any>>()
+    private val coders = mutableMapOf<KType, KormCoder<Any>>()
 
     /**
      * Creates a table based on a row that will be inserted into it.
@@ -222,9 +222,15 @@ class Korm(private val conn: Connection) {
         conn.close()
     }
 
-    fun <T: Any> addCoder(encoder: Encoder<T>, decoder: Decoder<T>, dataType: String) {
+    /**
+     * Adds a new coder to the ORM to handle custom data types, or overwrite default behaviour.
+     */
+    fun <T: Any> addCoder(coder: KormCoder<T>) {
         @Suppress("UNCHECKED_CAST")
-        coders[decoder.reflect()!!.returnType] = Coder(encoder, decoder, dataType) as Coder<Any>
+        coders[coder.decoder.reflect()!!.returnType] = coder as KormCoder<Any>
+    }
+    fun <T: Any> addCoder(encoder: Encoder<T>, decoder: Decoder<T>, dataType: String) {
+        addCoder(KormCoder(encoder, decoder, dataType))
     }
 
     private fun <T: Any> applyEncoder(type: KType, pstmt: PreparedStatement, index: Int, data: T?) {
