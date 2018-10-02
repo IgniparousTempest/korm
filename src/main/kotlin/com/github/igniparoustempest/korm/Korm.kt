@@ -1,9 +1,18 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.OrmHelper.Companion.foreignKeyColumns
+import com.github.igniparoustempest.korm.OrmHelper.Companion.foreignKeyType
+import com.github.igniparoustempest.korm.OrmHelper.Companion.isPrimaryKey
+import com.github.igniparoustempest.korm.OrmHelper.Companion.isPrimaryKeyAuto
+import com.github.igniparoustempest.korm.OrmHelper.Companion.isUnsetPrimaryKeyAuto
+import com.github.igniparoustempest.korm.OrmHelper.Companion.primaryKeyColumns
+import com.github.igniparoustempest.korm.OrmHelper.Companion.primaryKeyType
+import com.github.igniparoustempest.korm.OrmHelper.Companion.readProperty
 import com.github.igniparoustempest.korm.exceptions.DatabaseException
 import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
 import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKey
+import com.github.igniparoustempest.korm.types.PrimaryKeyAuto
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.PreparedStatement
@@ -18,7 +27,6 @@ import kotlin.reflect.full.instanceParameter
 import kotlin.reflect.full.memberFunctions
 import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.full.withNullability
-import kotlin.reflect.jvm.isAccessible
 import kotlin.reflect.jvm.reflect
 
 
@@ -42,14 +50,14 @@ class Korm(private val conn: Connection) {
                     coders[it.returnType.withNullability(false)]!!.dataType
                 else
                     when (it.returnType.withNullability(false)) {
-                        PrimaryKey::class.createType() -> "INTEGER PRIMARY KEY"
                         Boolean::class.createType() -> "INTEGER"
                         Float::class.createType() -> "REAL"
-                        ForeignKey::class.createType() -> {
-                            val fk = readProperty(row, it.name) as ForeignKey
-                            "INTEGER REFERENCES ${fk.foreignTableName}(${fk.foreignColumnName}) ON UPDATE CASCADE"
-                        }
+                        foreignKeyType(Int::class) -> "INTEGER"
+                        foreignKeyType(String::class) -> "TEXT"
                         Int::class.createType() -> "INTEGER"
+                        PrimaryKeyAuto::class.createType() -> "INTEGER"
+                        primaryKeyType(Int::class) -> "INTEGER"
+                        primaryKeyType(String::class) -> "TEXT"
                         String::class.createType() -> "TEXT"
                         else -> throw UnsupportedDataTypeException("Invalid data type ${it.returnType}.")
                     }
@@ -58,7 +66,19 @@ class Korm(private val conn: Connection) {
 
             colType
         }
-        val sql = "CREATE TABLE IF NOT EXISTS $tableName ($columnNames)"
+        // Primary Keys
+        val primaryKeyNames = primaryKeyColumns(columns).map { it.name }
+        val primaryKeyDefinition = if (primaryKeyNames.isEmpty()) "" else ", PRIMARY KEY(%s)".format(primaryKeyNames.joinToString(", "))
+        // Foreign Keys
+        val foreignKeys = foreignKeyColumns(columns)
+        val foreignKeyNames = foreignKeys.joinToString(", ") { it.name }
+        val foreignPrimaryKeyNames = foreignKeys.joinToString(", ") { (readProperty(row, it.name) as ForeignKey<*>).foreignColumnName }
+        val foreignTableNames = foreignKeys.map { (readProperty(row, it.name) as ForeignKey<*>).foreignTableName  }
+        val foreignTableName = if (foreignTableNames.isEmpty()) null else foreignTableNames.first()
+        foreignTableNames.forEach { if (it != foreignTableName) throw DatabaseException("Composite Foreign Keys need to reference the same table.", Exception(), "") }
+        val foreignKeyDefinition = if (foreignKeys.isEmpty()) "" else ", FOREIGN KEY(%s) REFERENCES $foreignTableName(%s) ON UPDATE CASCADE".format(foreignKeyNames, foreignPrimaryKeyNames)
+
+        val sql = "CREATE TABLE IF NOT EXISTS $tableName ($columnNames$primaryKeyDefinition$foreignKeyDefinition)"
 
         try {
             val stmt = conn.createStatement()
@@ -159,7 +179,7 @@ class Korm(private val conn: Connection) {
      */
     fun <T: Any> insert(row: T): T {
         val tableName = tableName(row)
-        val columns = columnNames(row).filter { it.returnType != PrimaryKey::class.createType() }
+        val columns = columnNames(row).filter { !isUnsetPrimaryKeyAuto(row, it) }
         val columnString = columns.joinToString(",") { it.name }
         val valuesString = columns.joinToString(",") { "?" }
         val sql = "INSERT INTO $tableName($columnString) VALUES($valuesString)"
@@ -173,12 +193,15 @@ class Korm(private val conn: Connection) {
             val generatedKeys = pstmt.generatedKeys
             pstmt.close()
 
-            // Create copy of row with the correct primary key
-            generatedKeys.next()
-            val key = PrimaryKey(generatedKeys.getInt("last_insert_rowid()"))
-            val primaryKeyProperty = columnNames(row).first { it.returnType.withNullability(false) == PrimaryKey::class.createType() }
-            val updates = mapOf(primaryKeyProperty.name to key)
-            return reflectCopy(row, updates)
+            // Create copy of row with the correct auto primary key, if there are no values set
+            return if (columnNames(row).sumBy { if (isUnsetPrimaryKeyAuto(row, it)) 1 else 0 } > 0) {
+                generatedKeys.next()
+                val key = PrimaryKeyAuto(generatedKeys.getInt("last_insert_rowid()"))
+                val primaryKeyProperty = columnNames(row).first { isPrimaryKeyAuto(it) }
+                val updates = mapOf(primaryKeyProperty.name to key)
+                reflectCopy(row, updates)
+            } else
+                row
         } catch (e: SQLException) {
             // Creates the table if it doesn't already exist
             if (e.message == "[SQLITE_ERROR] SQL error or missing database (no such table: $tableName)") {
@@ -237,12 +260,16 @@ class Korm(private val conn: Connection) {
         if (coders.contains(type))
             coders[type]!!.encoder(pstmt, index, data)
         else
+            @Suppress("UNCHECKED_CAST")
             when (type) {
                 Boolean::class.createType() -> pstmt.setBool(index, data as Boolean?)
                 Float::class.createType() -> pstmt.setFloating(index, data as Float?)
-                ForeignKey::class.createType() -> pstmt.setInteger(index, (data as ForeignKey).value)
+                foreignKeyType(Int::class) -> pstmt.setInteger(index, (data as ForeignKey<Int>).value)
+                foreignKeyType(String::class) -> pstmt.setString(index, (data as ForeignKey<String>).value)
                 Int::class.createType() -> pstmt.setInteger(index, data as Int?)
-                PrimaryKey::class.createType() -> pstmt.setInteger(index, (data as PrimaryKey).value)
+                PrimaryKeyAuto::class.createType() -> pstmt.setInteger(index, (data as PrimaryKey<Int>).value)
+                primaryKeyType(Int::class) -> pstmt.setInteger(index, (data as PrimaryKey<Int>).value)
+                primaryKeyType(String::class) -> pstmt.setString(index, (data as PrimaryKey<String>).value)
                 String::class.createType() -> pstmt.setString(index, data as String?)
                 else -> throw UnsupportedDataTypeException("Invalid data type $type.")
             }
@@ -255,9 +282,12 @@ class Korm(private val conn: Connection) {
             when (type) {
                 Boolean::class.createType() -> rs.getBool(columnName)
                 Float::class.createType() -> rs.getFloating(columnName)
-                ForeignKey::class.createType() -> ForeignKey(null, null, rs.getInt(columnName))
+                foreignKeyType(Int::class) -> ForeignKey(null, null, rs.getInt(columnName))
+                foreignKeyType(String::class) -> ForeignKey(null, null, rs.getString(columnName))
                 Int::class.createType() -> rs.getInteger(columnName)
-                PrimaryKey::class.createType() -> PrimaryKey(rs.getInteger(columnName))
+                PrimaryKeyAuto::class.createType() -> PrimaryKeyAuto(rs.getInteger(columnName))
+                primaryKeyType(Int::class) -> PrimaryKey(rs.getInt(columnName))
+                primaryKeyType(String::class) -> PrimaryKey(rs.getString(columnName))
                 String::class.createType() -> rs.getString(columnName)
                 else -> throw UnsupportedDataTypeException("Invalid data type $type.")
             }
@@ -295,18 +325,5 @@ class Korm(private val conn: Connection) {
         val parametersNames = clazz.primaryConstructor!!.parameters.map { it.name }
         @Suppress("UNCHECKED_CAST")
         return clazz.declaredMemberProperties.filter { parametersNames.contains(it.name) } as List<KProperty1<out String, Any?>>
-    }
-
-    /**
-     * Reads a property from a object based on the name of the property.
-     * Can read private properties too.
-     */
-    private fun <T: Any> readProperty(instance: T, propertyName: String): T? {
-        val clazz = instance.javaClass.kotlin
-        @Suppress("UNCHECKED_CAST")
-        clazz.declaredMemberProperties.first { it.name == propertyName }.let {
-            it.isAccessible = true
-            return it.get(instance) as T?
-        }
     }
 }

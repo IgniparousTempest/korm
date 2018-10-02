@@ -1,17 +1,17 @@
 package com.github.igniparoustempest.korm.types
 
-class PrimaryKey(val value: Int? = null) {
+open class PrimaryKey<T: Any?>(val value: T) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        return when (other?.javaClass) {
-            javaClass -> (other as PrimaryKey).value == value
-            Int::class.java -> value == other
-            else -> false
-        }
+        if (javaClass != other?.javaClass) return false
+
+        other as PrimaryKey<*>
+
+        return value == other.value
     }
 
     override fun hashCode(): Int {
-        return value ?: 0
+        return value?.hashCode() ?: 0
     }
 
     override fun toString(): String {

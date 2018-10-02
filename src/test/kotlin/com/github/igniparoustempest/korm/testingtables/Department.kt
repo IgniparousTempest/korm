@@ -1,8 +1,8 @@
 package com.github.igniparoustempest.korm.testingtables
 
-import com.github.igniparoustempest.korm.types.PrimaryKey
+import com.github.igniparoustempest.korm.types.PrimaryKeyAuto
 
 data class Department(
-        val departmentId: PrimaryKey = PrimaryKey(),
+        val departmentId: PrimaryKeyAuto = PrimaryKeyAuto(),
         val name: String
 )
