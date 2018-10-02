@@ -111,54 +111,54 @@ class KormConditionTest {
         val dogs = listOf(
                 Dog(
                         name = "Jasper",
-                        yearOfBirsth = 1988,  // This is wrong
+                        yearOfBirth = 1988,  // This is wrong
                         breed = "Golden Retriever"
                 ),
                 Dog(
                         name = "Honey",
-                        yearOfBirsth = 1988,  // This is wrong
+                        yearOfBirth = 1988,  // This is wrong
                         breed = "Golden Retriever"
                 ),
                 Dog(
                         name = "Freckle",
-                        yearOfBirsth = 1989,  // This is wrong
+                        yearOfBirth = 1989,  // This is wrong
                         breed = "Jack-Russel"
                 ),
                 Dog(
                         name = "Ditto",
-                        yearOfBirsth = 2000,  // This is wrong
+                        yearOfBirth = 2000,  // This is wrong
                         breed = "Jack-Russel"
                 ),
                 Dog(
                         name = "Baggins",
-                        yearOfBirsth = 2003,
+                        yearOfBirth = 2003,
                         breed = "Jack-Russel"
                 ),
                 Dog(
                         name = "Shenzi",
-                        yearOfBirsth = 2005,
+                        yearOfBirth = 2005,
                         breed = "Golden Retriever"
                 ),
                 Dog(
                         name = "Ntombi",
-                        yearOfBirsth = 2011,
+                        yearOfBirth = 2011,
                         breed = "Jack-Russel"
                 )
         ).map { orm.insert(it) }
 
     assertEquals(listOf(dogs[0]), orm.find(Dog::class, Dog::name eq "Jasper"), "=")
-    assertEquals(dogs.drop(2), orm.find(Dog::class, Dog::yearOfBirsth neq 1988), "!=")
-    assertEquals(dogs.dropLast(4), orm.find(Dog::class, Dog::yearOfBirsth lt 2000), "<")
-    assertEquals(dogs.dropLast(3), orm.find(Dog::class, Dog::yearOfBirsth lte 2000), "<=")
-    assertEquals(dogs.drop(4), orm.find(Dog::class, Dog::yearOfBirsth gt 2000), ">")
-    assertEquals(dogs.drop(3), orm.find(Dog::class, Dog::yearOfBirsth gte 2000), ">=")
+    assertEquals(dogs.drop(2), orm.find(Dog::class, Dog::yearOfBirth neq 1988), "!=")
+    assertEquals(dogs.dropLast(4), orm.find(Dog::class, Dog::yearOfBirth lt 2000), "<")
+    assertEquals(dogs.dropLast(3), orm.find(Dog::class, Dog::yearOfBirth lte 2000), "<=")
+    assertEquals(dogs.drop(4), orm.find(Dog::class, Dog::yearOfBirth gt 2000), ">")
+    assertEquals(dogs.drop(3), orm.find(Dog::class, Dog::yearOfBirth gte 2000), ">=")
     assertEquals(listOf(dogs[4]), orm.find(Dog::class, Dog::name like "Bag_i%"), "LIKE")
     assertEquals(listOf(dogs[4]), orm.find(Dog::class, Dog::name glob "Bag?i*"), "GLOB")
-    assertEquals(dogs.drop(3).dropLast(1), orm.find(Dog::class, Dog::yearOfBirsth between Pair(2000, 2005)), "BETWEEN")
-    assertEquals(dogs, orm.find(Dog::class, Dog::yearOfBirsth.notNull()), "NOT NULL")
+    assertEquals(dogs.drop(3).dropLast(1), orm.find(Dog::class, Dog::yearOfBirth between Pair(2000, 2005)), "BETWEEN")
+    assertEquals(dogs, orm.find(Dog::class, Dog::yearOfBirth.notNull()), "NOT NULL")
     assertEquals(emptyList(), orm.find(Dog::class, Dog::name.isNull()), "IS NULL")
     assertEquals(listOf(dogs[4]), orm.find(Dog::class, Dog::name glob "B*" and (Dog::breed eq "Jack-Russel")), "AND")
     assertEquals(listOf(dogs[4], dogs[6]), orm.find(Dog::class, Dog::name like "Nt%" or (Dog::name eq "Baggins")), "OR")
-    assertEquals(listOf(dogs[4]), orm.find(Dog::class, Dog::name like "B%" and b(Dog::yearOfBirsth eq 2003 or (Dog::yearOfBirsth eq 2004))), "()")
+    assertEquals(listOf(dogs[4]), orm.find(Dog::class, Dog::name like "B%" and b(Dog::yearOfBirth eq 2003 or (Dog::yearOfBirth eq 2004))), "()")
     }
 }
