@@ -2,6 +2,7 @@ package com.github.igniparoustempest.korm
 
 import com.github.igniparoustempest.korm.conditions.*
 import com.github.igniparoustempest.korm.exceptions.DatabaseException
+import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
 import com.github.igniparoustempest.korm.testingtables.*
 import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKeyAuto
@@ -179,6 +180,9 @@ class KormTest {
 
         val orm = Korm()
 
+        // Delete from table that doesn't exist
+        orm.delete(Student::class, Student::studentId eq 1)
+
         // Save data
         students = students.map { orm.insert(it) }
 
@@ -199,6 +203,9 @@ class KormTest {
         val students = (1..10).map { randomStudent() }
 
         val orm = Korm()
+
+        // Drop table that doesn't exist
+        orm.drop(Student::class)
 
         // Save data
         for (student in students)
@@ -281,6 +288,10 @@ class KormTest {
 
         val orm = Korm()
 
+        assertFailsWith<UnsupportedDataTypeException> {
+            orm.insert(students[0])
+        }
+
         // Add the encoder/decoder for the Discipline type
         val encoder: Encoder<Discipline> = { ps, parameterIndex, x -> ps.setString(parameterIndex, x.toString())}
         val decoder: Decoder<Discipline> = { rs, columnLabel -> Discipline.fromString(rs.getString(columnLabel))}
@@ -354,6 +365,12 @@ class KormTest {
         orm.rawSqlQuery("SELECT * FROM Test") {
             while (it.next())
                 retrieved.add(Pair(it.getInt("id"), it.getString("data")))
+        }
+        assertFailsWith<DatabaseException> {
+            orm.rawSql("Malformed SQL")
+        }
+        assertFailsWith<DatabaseException> {
+            orm.rawSqlQuery("INSERT INTO Test(id, data) VALUES (33, 'dec')")
         }
         orm.rawSql("DROP TABLE Test")
 

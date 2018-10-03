@@ -95,7 +95,7 @@ class Korm(private val conn: Connection) {
      * @throws DatabaseException If the underlying database throws an error that can't be handled here.
      */
     fun <T: Any> delete(clazz: KClass<T>, condition: KormCondition) {
-        val tableName = clazz.simpleName
+        val tableName = tableName(clazz)
         val sql = "DELETE FROM $tableName WHERE ${condition.sql}"
 
         try {
@@ -106,7 +106,7 @@ class Korm(private val conn: Connection) {
             pstmt.executeUpdate()
             pstmt.close()
         } catch (e: SQLException) {
-            // Creates the table if it doesn't already exist
+            // Table doesn't exist
             if (e.message == "[SQLITE_ERROR] SQL error or missing database (no such table: $tableName)") {
                 return
             }
@@ -120,7 +120,7 @@ class Korm(private val conn: Connection) {
      * @throws DatabaseException If the underlying database throws an error that can't be handled here.
      */
     fun <T: Any> drop(clazz: KClass<T>) {
-        val tableName = clazz.simpleName
+        val tableName = tableName(clazz)
         val sql = "DROP TABLE IF EXISTS $tableName"
         try {
             val stmt = conn.createStatement()
@@ -138,7 +138,7 @@ class Korm(private val conn: Connection) {
      * @throws UnsupportedDataTypeException If the T class contains a member with an unsupported data type.
      */
     fun <T: Any> find(clazz: KClass<T>, condition: KormCondition? = null): List<T> {
-        val tableString = clazz.simpleName
+        val tableString = tableName(clazz)
         var sql = "SELECT * FROM $tableString"
         if (condition != null)
             sql += " WHERE " + condition.sql
@@ -220,7 +220,7 @@ class Korm(private val conn: Connection) {
      * @throws UnsupportedDataTypeException If the class contains a member with an unsupported data type.
      */
     fun <T: Any> update(clazz: KClass<T>, updater: KormUpdater) {
-        val tableName = clazz.simpleName
+        val tableName = tableName(clazz)
         var sql = "UPDATE $tableName SET ${updater.sql}"
         if (updater.condition != null)
             sql += " WHERE ${updater.condition.sql}"
