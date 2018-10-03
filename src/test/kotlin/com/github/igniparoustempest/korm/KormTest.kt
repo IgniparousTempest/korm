@@ -6,6 +6,7 @@ import com.github.igniparoustempest.korm.testingtables.*
 import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKeyAuto
 import com.github.igniparoustempest.korm.updates.*
+import org.fluttercode.datafactory.impl.DataFactory
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
@@ -125,6 +126,26 @@ class KormTest {
         orm.insert(student)
 
         verify(conn).prepareStatement("INSERT INTO Student(age,firstName,height,maidenName,surname) VALUES(?,?,?,?,?)")
+    }
+
+    @Test
+    fun rawSQL() {
+        val conn = mock(Connection::class.java)
+        val statement = mock(PreparedStatement::class.java)
+        val resultSet = mock(ResultSet::class.java)
+        val orm = Korm(conn = conn)
+        Mockito.`when`(conn.createStatement()).thenReturn(statement)
+        Mockito.`when`(statement.executeQuery(any())).thenReturn(resultSet)
+        val df = DataFactory()
+
+        val queries = (1..10).map { df.getRandomChars(10, 100) }
+        queries.forEach { orm.rawSql(it) }
+        queries.forEach { orm.rawSqlQuery(it) }
+
+        queries.forEach {
+            verify(statement).executeUpdate(it)
+            verify(statement).executeQuery(it)
+        }
     }
 
     @Test
@@ -315,6 +336,29 @@ class KormTest {
         val fkRetrieved = fk.map { orm.insert(it) }
 
         assertEquals(fk, fkRetrieved, "Should preserve foreign keys when inserting.")
+        orm.close()
+    }
+
+    @Test
+    fun integrationRawSQL() {
+        val orm = Korm()
+
+        orm.rawSql("CREATE TABLE Test(id INTEGER PRIMARY KEY, data TEXT)")
+        orm.rawSql("INSERT INTO Test(id, data) VALUES (2, 'abc')")
+        orm.rawSql("INSERT INTO Test(id, data) VALUES (5, 'def')")
+        orm.rawSql("INSERT INTO Test(id, data) VALUES (7, 'ghi')")
+        orm.rawSql("INSERT INTO Test(id, data) VALUES (1, 'jkl')")
+        orm.rawSql("UPDATE Test SET data = 'abbc' WHERE id = 2")
+        val retrieved = mutableListOf<Pair<Int, String>>()
+        orm.rawSqlQuery("SELECT * FROM Test")  // Test without action
+        orm.rawSqlQuery("SELECT * FROM Test") {
+            while (it.next())
+                retrieved.add(Pair(it.getInt("id"), it.getString("data")))
+        }
+        orm.rawSql("DROP TABLE Test")
+
+        val expected = listOf(Pair(1, "jkl"), Pair(2, "abbc"), Pair(5, "def"), Pair(7, "ghi"))
+        assertEquals(expected, retrieved, "Should preserve foreign keys when inserting.")
         orm.close()
     }
 
