@@ -1,12 +1,9 @@
 package com.github.igniparoustempest.korm
 
-import com.github.igniparoustempest.korm.testingtables.Department
-import com.github.igniparoustempest.korm.testingtables.Discipline
-import com.github.igniparoustempest.korm.testingtables.Student
-import com.github.igniparoustempest.korm.testingtables.StudentAdvanced
-import com.github.igniparoustempest.korm.testingtables.StudentFK
+import com.github.igniparoustempest.korm.testingtables.*
 import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKey
+import com.github.igniparoustempest.korm.types.PrimaryKeyAuto
 import org.fluttercode.datafactory.impl.DataFactory
 import java.util.Random
 
@@ -42,10 +39,19 @@ fun randomStudentAdvanced(): StudentAdvanced {
     )
 }
 
-fun randomStudentFK(departmentId: PrimaryKey): StudentFK {
+fun randomStudentFK(departmentId: PrimaryKeyAuto): StudentFK {
     val df = DataFactory()
     return StudentFK(
             name = df.firstName,
             departmentId = ForeignKey(Department::departmentId, departmentId)
+    )
+}
+
+fun randomMultiplePrimaries(key1: Int, key2: String): MultiplePrimaries {
+    val df = DataFactory()
+    return MultiplePrimaries(
+            id1 = PrimaryKey(key1),
+            id2 = PrimaryKey(key2),
+            name = df.firstName
     )
 }

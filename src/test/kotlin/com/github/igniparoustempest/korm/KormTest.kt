@@ -2,13 +2,11 @@ package com.github.igniparoustempest.korm
 
 import com.github.igniparoustempest.korm.conditions.*
 import com.github.igniparoustempest.korm.exceptions.DatabaseException
-import com.github.igniparoustempest.korm.testingtables.Department
-import com.github.igniparoustempest.korm.testingtables.Discipline
-import com.github.igniparoustempest.korm.testingtables.Student
-import com.github.igniparoustempest.korm.testingtables.StudentAdvanced
-import com.github.igniparoustempest.korm.testingtables.StudentFK
-import com.github.igniparoustempest.korm.types.PrimaryKey
+import com.github.igniparoustempest.korm.testingtables.*
+import com.github.igniparoustempest.korm.types.ForeignKey
+import com.github.igniparoustempest.korm.types.PrimaryKeyAuto
 import com.github.igniparoustempest.korm.updates.*
+import org.fluttercode.datafactory.impl.DataFactory
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
@@ -31,7 +29,7 @@ class KormTest {
         Mockito.`when`(conn.createStatement()).thenReturn(statement)
         orm.createTable(randomStudent())
 
-        verify(statement).execute("CREATE TABLE IF NOT EXISTS Student (age INTEGER NOT NULL, firstName TEXT NOT NULL, height REAL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)")
+        verify(statement).execute("CREATE TABLE IF NOT EXISTS Student (age INTEGER NOT NULL, firstName TEXT NOT NULL, height REAL, maidenName TEXT, studentId INTEGER NOT NULL, surname TEXT NOT NULL, PRIMARY KEY(studentId))")
     }
 
     @Test
@@ -48,7 +46,7 @@ class KormTest {
 
         orm.createTable(randomStudentAdvanced())
 
-        verify(statement).execute("CREATE TABLE IF NOT EXISTS StudentAdvanced (age INTEGER NOT NULL, discipline TEXT NOT NULL, firstName TEXT NOT NULL, height REAL, isCurrent INTEGER NOT NULL, isFailing INTEGER NOT NULL, maidenName TEXT, studentId INTEGER PRIMARY KEY NOT NULL, surname TEXT NOT NULL)")
+        verify(statement).execute("CREATE TABLE IF NOT EXISTS StudentAdvanced (age INTEGER NOT NULL, discipline TEXT NOT NULL, firstName TEXT NOT NULL, height REAL, isCurrent INTEGER NOT NULL, isFailing INTEGER NOT NULL, maidenName TEXT, studentId INTEGER NOT NULL, surname TEXT NOT NULL, PRIMARY KEY(studentId))")
     }
 
     @Test
@@ -58,10 +56,21 @@ class KormTest {
         val orm = Korm(conn = conn)
         Mockito.`when`(conn.createStatement()).thenReturn(statement)
         orm.createTable(randomDepartment())
-        orm.createTable(randomStudentFK(PrimaryKey(9001)))
+        orm.createTable(randomStudentFK(PrimaryKeyAuto(9001)))
 
-        verify(statement).execute("CREATE TABLE IF NOT EXISTS Department (departmentId INTEGER PRIMARY KEY NOT NULL, name TEXT NOT NULL)")
-        verify(statement).execute("CREATE TABLE IF NOT EXISTS StudentFK (departmentId INTEGER REFERENCES Department(departmentId) ON UPDATE CASCADE NOT NULL, name TEXT NOT NULL, studentId INTEGER PRIMARY KEY NOT NULL)")
+        verify(statement).execute("CREATE TABLE IF NOT EXISTS Department (departmentId INTEGER NOT NULL, name TEXT NOT NULL, PRIMARY KEY(departmentId))")
+        verify(statement).execute("CREATE TABLE IF NOT EXISTS StudentFK (departmentId INTEGER NOT NULL, name TEXT NOT NULL, studentId INTEGER NOT NULL, PRIMARY KEY(studentId), FOREIGN KEY(departmentId) REFERENCES Department(departmentId) ON UPDATE CASCADE)")
+    }
+
+    @Test
+    fun createTablePrimaryKey() {
+        val conn = mock(Connection::class.java)
+        val statement = mock(Statement::class.java)
+        val orm = Korm(conn = conn)
+        Mockito.`when`(conn.createStatement()).thenReturn(statement)
+        orm.createTable(randomMultiplePrimaries(1, "abc"))
+
+        verify(statement).execute("CREATE TABLE IF NOT EXISTS MultiplePrimaries (id1 INTEGER NOT NULL, id2 TEXT NOT NULL, name TEXT NOT NULL, PRIMARY KEY(id1, id2))")
     }
 
     @Test
@@ -117,6 +126,26 @@ class KormTest {
         orm.insert(student)
 
         verify(conn).prepareStatement("INSERT INTO Student(age,firstName,height,maidenName,surname) VALUES(?,?,?,?,?)")
+    }
+
+    @Test
+    fun rawSQL() {
+        val conn = mock(Connection::class.java)
+        val statement = mock(PreparedStatement::class.java)
+        val resultSet = mock(ResultSet::class.java)
+        val orm = Korm(conn = conn)
+        Mockito.`when`(conn.createStatement()).thenReturn(statement)
+        Mockito.`when`(statement.executeQuery(any())).thenReturn(resultSet)
+        val df = DataFactory()
+
+        val queries = (1..10).map { df.getRandomChars(10, 100) }
+        queries.forEach { orm.rawSql(it) }
+        queries.forEach { orm.rawSqlQuery(it) }
+
+        queries.forEach {
+            verify(statement).executeUpdate(it)
+            verify(statement).executeQuery(it)
+        }
     }
 
     @Test
@@ -274,7 +303,7 @@ class KormTest {
      */
     @Test
     fun integrationLocalClass() {
-        data class Local(val localId: PrimaryKey = PrimaryKey(), val name: String)
+        data class Local(val localId: PrimaryKeyAuto = PrimaryKeyAuto(), val name: String)
 
         val orm = Korm()
 
@@ -284,6 +313,52 @@ class KormTest {
         // Run tests
         assertEquals(rows, orm.find(Local::class), "Should retrieve all rows.")
         assertEquals(listOf(rows[0]), orm.find(Local::class, Local::name eq "a"), "Should retrieve with condition.")
+        orm.close()
+    }
+
+    /**
+     * Tests classes with multiple primary keys.
+     */
+    @Test
+    fun integrationPrimaryKeys() {
+        val orm = Korm()
+
+        // Table with multiple primaries
+        val rows = (1..12).map { randomMultiplePrimaries(it * 2, "a".repeat(it)) }
+        val insertedRows = rows.map { orm.insert(it) }
+        val retrievedRows = orm.find(MultiplePrimaries::class)
+
+        assertEquals(rows, insertedRows, "Should preserve primary keys when inserting.")
+        assertEquals(rows, retrievedRows, "Should preserve primary keys when retrieving.")
+
+        // Tables referencing that table
+        val fk = rows.map { MultipleForeigns("data", ForeignKey(MultiplePrimaries::id1, it.id1), ForeignKey(MultiplePrimaries::id2, it.id2)) }
+        val fkRetrieved = fk.map { orm.insert(it) }
+
+        assertEquals(fk, fkRetrieved, "Should preserve foreign keys when inserting.")
+        orm.close()
+    }
+
+    @Test
+    fun integrationRawSQL() {
+        val orm = Korm()
+
+        orm.rawSql("CREATE TABLE Test(id INTEGER PRIMARY KEY, data TEXT)")
+        orm.rawSql("INSERT INTO Test(id, data) VALUES (2, 'abc')")
+        orm.rawSql("INSERT INTO Test(id, data) VALUES (5, 'def')")
+        orm.rawSql("INSERT INTO Test(id, data) VALUES (7, 'ghi')")
+        orm.rawSql("INSERT INTO Test(id, data) VALUES (1, 'jkl')")
+        orm.rawSql("UPDATE Test SET data = 'abbc' WHERE id = 2")
+        val retrieved = mutableListOf<Pair<Int, String>>()
+        orm.rawSqlQuery("SELECT * FROM Test")  // Test without action
+        orm.rawSqlQuery("SELECT * FROM Test") {
+            while (it.next())
+                retrieved.add(Pair(it.getInt("id"), it.getString("data")))
+        }
+        orm.rawSql("DROP TABLE Test")
+
+        val expected = listOf(Pair(1, "jkl"), Pair(2, "abbc"), Pair(5, "def"), Pair(7, "ghi"))
+        assertEquals(expected, retrieved, "Should preserve foreign keys when inserting.")
         orm.close()
     }
 

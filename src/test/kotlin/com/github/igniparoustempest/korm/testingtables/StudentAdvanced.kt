@@ -1,9 +1,9 @@
 package com.github.igniparoustempest.korm.testingtables
 
-import com.github.igniparoustempest.korm.types.PrimaryKey
+import com.github.igniparoustempest.korm.types.PrimaryKeyAuto
 
 data class StudentAdvanced(
-        val studentId: PrimaryKey = PrimaryKey(),
+        val studentId: PrimaryKeyAuto = PrimaryKeyAuto(),
         val firstName: String,
         val surname: String,
         val maidenName: String?,

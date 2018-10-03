@@ -16,11 +16,11 @@ allprojects {
 }
 
 dependencies {
-    implementation("com.github.IgniparousTempest:korm:v0.4.1")
+    implementation("com.github.IgniparousTempest:korm:v0.5.0")
 }
 ```
 
-See [Jitpack.io](https://jitpack.io/#IgniparousTempest/korm/v0.4.1) for including this library with different frameworks or for different versions.
+See [Jitpack.io](https://jitpack.io/#IgniparousTempest/korm/v0.5.0) for including this library with different frameworks or for different versions.
 
 ## Create a new database
 
@@ -42,7 +42,7 @@ The insert function returns the class with the primary keys and foreign keys mat
 
 ```kotlin
 data class Student(
-    val studentId: PrimaryKey = PrimaryKey(),
+    val studentId: AutoPrimaryKey = AutoPrimaryKey(),
     val firstName: String,
     val surname: String,
     val maidenName: String?,
@@ -111,7 +111,7 @@ data class Degree(val name: String, val year: Int) {
 }
 
 data class Student (
-    var studentId: PrimaryKey = PrimaryKey(),
+    var studentId: AutoPrimaryKey = AutoPrimaryKey(),
     val surname: String,
     val degree: Degree
 )
@@ -127,9 +127,9 @@ orm.addCoder(KormCoder(
 
 ```kotlin
 data class Dog(
-    val dogId: PrimaryKey,
+    val dogId: AutoPrimaryKey,
     val name: String,
-    val ownerId: ForeignKey
+    val ownerId: ForeignKey<Int>
 )
 
 val student = orm.insert(Student(/* Set parameters */))
@@ -137,5 +137,31 @@ val student = orm.insert(Student(/* Set parameters */))
 val dog = orm.insert(Dog(
     name = "Baggins", 
     ownerId = ForeignKey(Student::studentId, student.studentId)
+))
+```
+
+## Composite Keys
+
+Composite keys require their type to be specified.
+
+```kotlin
+data class Person(
+    val personId: PrimaryKey<Int>,
+    val surname: PrimaryKey<String>,
+    val firstName: String
+)
+
+data class Dog(
+    val name: String,
+    val ownerId: ForeignKey<Int>,
+    val ownerName: ForeignKey<String>
+)
+
+val owner = orm.insert(Person(PrimaryKey(1), PrimaryKey("Pitcher"), "Courtney"))
+
+val dog = orm.insert(Dog(
+    name = "Baggins", 
+    ownerId = ForeignKey(Person::personId, owner.personId),
+    ownerName = ForeignKey(Person::surname, owner.surname)
 ))
 ```
