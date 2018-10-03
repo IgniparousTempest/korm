@@ -2,9 +2,10 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPluginWrapper
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
+    kotlin("jvm") version "1.2.71"
+    jacoco
     java
     maven
-    kotlin("jvm") version "1.2.71"
 }
 
 group = "com.github.igniparoustempest"
@@ -16,6 +17,9 @@ val kotlinVersion = plugins.getPlugin(KotlinPluginWrapper::class.java).kotlinPlu
 val mockitoVersion = "2.22.0"
 val sqliteVersion = "3.23.1"
 
+jacoco {
+    toolVersion = "0.8.2"
+}
 
 repositories {
     mavenCentral()
@@ -50,5 +54,24 @@ tasks {
     artifacts {
         add("archives", sourcesJar)
         add("archives", javadocJar)
+    }
+
+    val codeCoverageReport by creating(JacocoReport::class) {
+        executionData(fileTree(project.rootDir.absolutePath).include("**/build/jacoco/*.exec"))
+
+        subprojects.onEach {
+            sourceSets(it.sourceSets["main"])
+        }
+
+        reports {
+            sourceDirectories =  files(sourceSets["main"].allSource.srcDirs)
+            classDirectories =  files(sourceSets["main"].output)
+            xml.isEnabled = true
+            xml.destination = File("$buildDir/reports/jacoco/report.xml")
+            html.isEnabled = true
+            csv.isEnabled = false
+        }
+
+        dependsOn("test")
     }
 }

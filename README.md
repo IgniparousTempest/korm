@@ -1,5 +1,7 @@
 # Korm
 
+[![](https://jitpack.io/v/IgniparousTempest/korm.svg)](https://jitpack.io/#IgniparousTempest/korm) [![Build Status](https://travis-ci.com/IgniparousTempest/korm.svg?branch=master)](https://travis-ci.com/IgniparousTempest/korm) [![codecov](https://codecov.io/gh/IgniparousTempest/korm/branch/master/graph/badge.svg)](https://codecov.io/gh/IgniparousTempest/korm)
+
 A super simple Kotlin ORM. It uses prepared statements for everything and is therefore not vulnerable to SQL Injection attacks, unlike [PultusORM](https://github.com/s4kibs4mi/PultusORM). It uses Reflection to generate all sql statements, which provides many compile time benefits.
 
 ## Usage
