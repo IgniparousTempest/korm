@@ -2,7 +2,6 @@ package com.github.igniparoustempest.korm
 
 import com.github.igniparoustempest.korm.OrmHelper.Companion.foreignKeyColumns
 import com.github.igniparoustempest.korm.OrmHelper.Companion.foreignKeyType
-import com.github.igniparoustempest.korm.OrmHelper.Companion.isPrimaryKey
 import com.github.igniparoustempest.korm.OrmHelper.Companion.isPrimaryKeyAuto
 import com.github.igniparoustempest.korm.OrmHelper.Companion.isUnsetPrimaryKeyAuto
 import com.github.igniparoustempest.korm.OrmHelper.Companion.primaryKeyColumns
@@ -52,10 +51,12 @@ class Korm(private val conn: Connection) {
                     when (it.returnType.withNullability(false)) {
                         Boolean::class.createType() -> "INTEGER"
                         Float::class.createType() -> "REAL"
+                        foreignKeyType(Float::class) -> "REAL"
                         foreignKeyType(Int::class) -> "INTEGER"
                         foreignKeyType(String::class) -> "TEXT"
                         Int::class.createType() -> "INTEGER"
                         PrimaryKeyAuto::class.createType() -> "INTEGER"
+                        primaryKeyType(Float::class) -> "REAL"
                         primaryKeyType(Int::class) -> "INTEGER"
                         primaryKeyType(String::class) -> "TEXT"
                         String::class.createType() -> "TEXT"
@@ -264,10 +265,12 @@ class Korm(private val conn: Connection) {
             when (type) {
                 Boolean::class.createType() -> pstmt.setBool(index, data as Boolean?)
                 Float::class.createType() -> pstmt.setFloating(index, data as Float?)
+                foreignKeyType(Float::class) -> pstmt.setFloating(index, (data as ForeignKey<Float>).value)
                 foreignKeyType(Int::class) -> pstmt.setInteger(index, (data as ForeignKey<Int>).value)
                 foreignKeyType(String::class) -> pstmt.setString(index, (data as ForeignKey<String>).value)
                 Int::class.createType() -> pstmt.setInteger(index, data as Int?)
                 PrimaryKeyAuto::class.createType() -> pstmt.setInteger(index, (data as PrimaryKey<Int>).value)
+                primaryKeyType(Float::class) -> pstmt.setFloating(index, (data as PrimaryKey<Float>).value)
                 primaryKeyType(Int::class) -> pstmt.setInteger(index, (data as PrimaryKey<Int>).value)
                 primaryKeyType(String::class) -> pstmt.setString(index, (data as PrimaryKey<String>).value)
                 String::class.createType() -> pstmt.setString(index, data as String?)
@@ -282,10 +285,12 @@ class Korm(private val conn: Connection) {
             when (type) {
                 Boolean::class.createType() -> rs.getBool(columnName)
                 Float::class.createType() -> rs.getFloating(columnName)
+                foreignKeyType(Float::class) -> ForeignKey(null, null, rs.getFloat(columnName))
                 foreignKeyType(Int::class) -> ForeignKey(null, null, rs.getInt(columnName))
                 foreignKeyType(String::class) -> ForeignKey(null, null, rs.getString(columnName))
                 Int::class.createType() -> rs.getInteger(columnName)
                 PrimaryKeyAuto::class.createType() -> PrimaryKeyAuto(rs.getInteger(columnName))
+                primaryKeyType(Float::class) -> PrimaryKey(rs.getFloat(columnName))
                 primaryKeyType(Int::class) -> PrimaryKey(rs.getInt(columnName))
                 primaryKeyType(String::class) -> PrimaryKey(rs.getString(columnName))
                 String::class.createType() -> rs.getString(columnName)
