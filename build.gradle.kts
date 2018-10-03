@@ -17,6 +17,9 @@ val kotlinVersion = plugins.getPlugin(KotlinPluginWrapper::class.java).kotlinPlu
 val mockitoVersion = "2.22.0"
 val sqliteVersion = "3.23.1"
 
+jacoco {
+    toolVersion = "0.8.2"
+}
 
 repositories {
     mavenCentral()
