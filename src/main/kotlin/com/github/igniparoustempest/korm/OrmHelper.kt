@@ -23,6 +23,22 @@ internal class OrmHelper {
         }
 
         /**
+         * Gets the name of a class from an instance of that class.
+         */
+        fun <T: Any> tableName(row: T) = row::class.simpleName
+        fun <T: KClass<*>> tableName(clazz: T) = clazz.simpleName
+
+        /**
+         * Gets the name of all member properties of an object.
+         */
+        fun <T: Any> columnNames(row: T) = columnNames(row::class)
+        fun <T: KClass<*>> columnNames(clazz: T): List<KProperty1<out String, Any?>> {
+            val parametersNames = clazz.primaryConstructor!!.parameters.map { it.name }
+            @Suppress("UNCHECKED_CAST")
+            return clazz.declaredMemberProperties.filter { parametersNames.contains(it.name) } as List<KProperty1<out String, Any?>>
+        }
+
+        /**
          * Gets fully qualified name of a column.
          * Eg age => Student.age
          */
@@ -72,7 +88,7 @@ internal class OrmHelper {
          * Determines if the automatic primary key has yet to have it's value assigned.
          */
         fun isUnsetPrimaryKeyAuto(row: Any, column: KProperty1<out String, Any?>): Boolean {
-            return column.returnType == PrimaryKeyAuto::class.createType() && (readProperty(row, column.name) as PrimaryKeyAuto?)?.isSet == false
+            return column.returnType.withNullability(false) == PrimaryKeyAuto::class.createType() && (readProperty(row, column.name) as PrimaryKeyAuto?)?.isSet == false
         }
 
         /**

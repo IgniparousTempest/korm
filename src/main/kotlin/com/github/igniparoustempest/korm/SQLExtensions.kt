@@ -43,7 +43,7 @@ fun PreparedStatement.setBool(parameterIndex: Int, x: Boolean?) {
  */
 fun PreparedStatement.setFloating(parameterIndex: Int, x: Float?) {
     if (x == null)
-        this.setNull(parameterIndex, Types.INTEGER)
+        this.setNull(parameterIndex, Types.REAL)
     else
         this.setFloat(parameterIndex, x)
 }

@@ -1,5 +1,6 @@
 package com.github.igniparoustempest.korm
 
+import com.github.igniparoustempest.korm.OrmHelper.Companion.columnNames
 import com.github.igniparoustempest.korm.OrmHelper.Companion.foreignKeyColumns
 import com.github.igniparoustempest.korm.OrmHelper.Companion.foreignKeyType
 import com.github.igniparoustempest.korm.OrmHelper.Companion.isPrimaryKeyAuto
@@ -7,6 +8,7 @@ import com.github.igniparoustempest.korm.OrmHelper.Companion.isUnsetPrimaryKeyAu
 import com.github.igniparoustempest.korm.OrmHelper.Companion.primaryKeyColumns
 import com.github.igniparoustempest.korm.OrmHelper.Companion.primaryKeyType
 import com.github.igniparoustempest.korm.OrmHelper.Companion.readProperty
+import com.github.igniparoustempest.korm.OrmHelper.Companion.tableName
 import com.github.igniparoustempest.korm.exceptions.DatabaseException
 import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
 import com.github.igniparoustempest.korm.types.ForeignKey
@@ -348,21 +350,5 @@ class Korm(private val conn: Connection) {
                     })
             )
         } as T
-    }
-
-    /**
-     * Gets the name of a class from an instance of that class.
-     */
-    private fun <T: Any> tableName(row: T) = row::class.simpleName
-    private fun <T: KClass<*>> tableName(clazz: T) = clazz.simpleName
-
-    /**
-     * Gets the name of all member properties of an object.
-     */
-    private fun <T: Any> columnNames(row: T) = columnNames(row::class)
-    private fun <T: KClass<*>> columnNames(clazz: T): List<KProperty1<out String, Any?>> {
-        val parametersNames = clazz.primaryConstructor!!.parameters.map { it.name }
-        @Suppress("UNCHECKED_CAST")
-        return clazz.declaredMemberProperties.filter { parametersNames.contains(it.name) } as List<KProperty1<out String, Any?>>
     }
 }
