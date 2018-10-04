@@ -1,12 +1,14 @@
 package com.github.igniparoustempest.korm
 
-import com.github.igniparoustempest.korm.OrmHelper.Companion.foreignKeyColumns
-import com.github.igniparoustempest.korm.OrmHelper.Companion.foreignKeyType
-import com.github.igniparoustempest.korm.OrmHelper.Companion.isPrimaryKeyAuto
-import com.github.igniparoustempest.korm.OrmHelper.Companion.isUnsetPrimaryKeyAuto
-import com.github.igniparoustempest.korm.OrmHelper.Companion.primaryKeyColumns
-import com.github.igniparoustempest.korm.OrmHelper.Companion.primaryKeyType
-import com.github.igniparoustempest.korm.OrmHelper.Companion.readProperty
+import com.github.igniparoustempest.korm.helper.columnNames
+import com.github.igniparoustempest.korm.helper.foreignKeyColumns
+import com.github.igniparoustempest.korm.helper.foreignKeyType
+import com.github.igniparoustempest.korm.helper.isPrimaryKeyAuto
+import com.github.igniparoustempest.korm.helper.isUnsetPrimaryKeyAuto
+import com.github.igniparoustempest.korm.helper.primaryKeyColumns
+import com.github.igniparoustempest.korm.helper.primaryKeyType
+import com.github.igniparoustempest.korm.helper.readProperty
+import com.github.igniparoustempest.korm.helper.tableName
 import com.github.igniparoustempest.korm.exceptions.DatabaseException
 import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
 import com.github.igniparoustempest.korm.types.ForeignKey
@@ -18,16 +20,13 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.SQLException
 import kotlin.reflect.KClass
-import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
 import kotlin.reflect.full.createType
-import kotlin.reflect.full.declaredMemberProperties
 import kotlin.reflect.full.instanceParameter
 import kotlin.reflect.full.memberFunctions
 import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.full.withNullability
 import kotlin.reflect.jvm.reflect
-
 
 class Korm(private val conn: Connection) {
     constructor(): this(DriverManager.getConnection("jdbc:sqlite::memory:", KormConfig().toProperties()))
@@ -95,7 +94,7 @@ class Korm(private val conn: Connection) {
      * @throws DatabaseException If the underlying database throws an error that can't be handled here.
      */
     fun <T: Any> delete(clazz: KClass<T>, condition: KormCondition) {
-        val tableName = clazz.simpleName
+        val tableName = tableName(clazz)
         val sql = "DELETE FROM $tableName WHERE ${condition.sql}"
 
         try {
@@ -106,7 +105,7 @@ class Korm(private val conn: Connection) {
             pstmt.executeUpdate()
             pstmt.close()
         } catch (e: SQLException) {
-            // Creates the table if it doesn't already exist
+            // Table doesn't exist
             if (e.message == "[SQLITE_ERROR] SQL error or missing database (no such table: $tableName)") {
                 return
             }
@@ -120,7 +119,7 @@ class Korm(private val conn: Connection) {
      * @throws DatabaseException If the underlying database throws an error that can't be handled here.
      */
     fun <T: Any> drop(clazz: KClass<T>) {
-        val tableName = clazz.simpleName
+        val tableName = tableName(clazz)
         val sql = "DROP TABLE IF EXISTS $tableName"
         try {
             val stmt = conn.createStatement()
@@ -138,7 +137,7 @@ class Korm(private val conn: Connection) {
      * @throws UnsupportedDataTypeException If the T class contains a member with an unsupported data type.
      */
     fun <T: Any> find(clazz: KClass<T>, condition: KormCondition? = null): List<T> {
-        val tableString = clazz.simpleName
+        val tableString = tableName(clazz)
         var sql = "SELECT * FROM $tableString"
         if (condition != null)
             sql += " WHERE " + condition.sql
@@ -220,7 +219,7 @@ class Korm(private val conn: Connection) {
      * @throws UnsupportedDataTypeException If the class contains a member with an unsupported data type.
      */
     fun <T: Any> update(clazz: KClass<T>, updater: KormUpdater) {
-        val tableName = clazz.simpleName
+        val tableName = tableName(clazz)
         var sql = "UPDATE $tableName SET ${updater.sql}"
         if (updater.condition != null)
             sql += " WHERE ${updater.condition.sql}"
@@ -291,7 +290,7 @@ class Korm(private val conn: Connection) {
         addCoder(KormCoder(encoder, decoder, dataType))
     }
 
-    private fun <T: Any> applyEncoder(type: KType, pstmt: PreparedStatement, index: Int, data: T?) {
+    internal fun <T: Any> applyEncoder(type: KType, pstmt: PreparedStatement, index: Int, data: T?) {
         if (coders.contains(type))
             coders[type]!!.encoder(pstmt, index, data)
         else
@@ -299,20 +298,20 @@ class Korm(private val conn: Connection) {
             when (type) {
                 Boolean::class.createType() -> pstmt.setBool(index, data as Boolean?)
                 Float::class.createType() -> pstmt.setFloating(index, data as Float?)
-                foreignKeyType(Float::class) -> pstmt.setFloating(index, (data as ForeignKey<Float>).value)
-                foreignKeyType(Int::class) -> pstmt.setInteger(index, (data as ForeignKey<Int>).value)
-                foreignKeyType(String::class) -> pstmt.setString(index, (data as ForeignKey<String>).value)
+                foreignKeyType(Float::class) -> pstmt.setFloating(index, (data as ForeignKey<Float>?)?.value)
+                foreignKeyType(Int::class) -> pstmt.setInteger(index, (data as ForeignKey<Int>?)?.value)
+                foreignKeyType(String::class) -> pstmt.setString(index, (data as ForeignKey<String>?)?.value)
                 Int::class.createType() -> pstmt.setInteger(index, data as Int?)
-                PrimaryKeyAuto::class.createType() -> pstmt.setInteger(index, (data as PrimaryKey<Int>).value)
-                primaryKeyType(Float::class) -> pstmt.setFloating(index, (data as PrimaryKey<Float>).value)
-                primaryKeyType(Int::class) -> pstmt.setInteger(index, (data as PrimaryKey<Int>).value)
-                primaryKeyType(String::class) -> pstmt.setString(index, (data as PrimaryKey<String>).value)
+                PrimaryKeyAuto::class.createType() -> pstmt.setInteger(index, (data as PrimaryKeyAuto?)?.value)
+                primaryKeyType(Float::class) -> pstmt.setFloating(index, (data as PrimaryKey<Float>?)?.value)
+                primaryKeyType(Int::class) -> pstmt.setInteger(index, (data as PrimaryKey<Int>?)?.value)
+                primaryKeyType(String::class) -> pstmt.setString(index, (data as PrimaryKey<String>?)?.value)
                 String::class.createType() -> pstmt.setString(index, data as String?)
                 else -> throw UnsupportedDataTypeException("Invalid data type $type.")
             }
     }
 
-    private fun applyDecoder(type: KType, rs: ResultSet, columnName: String?): Any? {
+    internal fun applyDecoder(type: KType, rs: ResultSet, columnName: String?): Any? {
         return if (coders.contains(type))
             coders[type]!!.decoder(rs, columnName)
         else
@@ -348,21 +347,5 @@ class Korm(private val conn: Connection) {
                     })
             )
         } as T
-    }
-
-    /**
-     * Gets the name of a class from an instance of that class.
-     */
-    private fun <T: Any> tableName(row: T) = row::class.simpleName
-    private fun <T: KClass<*>> tableName(clazz: T) = clazz.simpleName
-
-    /**
-     * Gets the name of all member properties of an object.
-     */
-    private fun <T: Any> columnNames(row: T) = columnNames(row::class)
-    private fun <T: KClass<*>> columnNames(clazz: T): List<KProperty1<out String, Any?>> {
-        val parametersNames = clazz.primaryConstructor!!.parameters.map { it.name }
-        @Suppress("UNCHECKED_CAST")
-        return clazz.declaredMemberProperties.filter { parametersNames.contains(it.name) } as List<KProperty1<out String, Any?>>
     }
 }

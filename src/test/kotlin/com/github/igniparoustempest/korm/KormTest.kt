@@ -2,21 +2,23 @@ package com.github.igniparoustempest.korm
 
 import com.github.igniparoustempest.korm.conditions.*
 import com.github.igniparoustempest.korm.exceptions.DatabaseException
+import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
+import com.github.igniparoustempest.korm.helper.foreignKeyType
+import com.github.igniparoustempest.korm.helper.primaryKeyType
 import com.github.igniparoustempest.korm.testingtables.*
 import com.github.igniparoustempest.korm.types.ForeignKey
+import com.github.igniparoustempest.korm.types.PrimaryKey
 import com.github.igniparoustempest.korm.types.PrimaryKeyAuto
 import com.github.igniparoustempest.korm.updates.*
 import org.fluttercode.datafactory.impl.DataFactory
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.verify
+import org.mockito.Mockito.*
 import java.nio.file.Paths
-import java.sql.Connection
-import java.sql.PreparedStatement
-import java.sql.ResultSet
-import java.sql.Statement
+import java.sql.*
+import java.util.*
+import kotlin.reflect.full.createType
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -30,6 +32,12 @@ class KormTest {
         orm.createTable(randomStudent())
 
         verify(statement).execute("CREATE TABLE IF NOT EXISTS Student (age INTEGER NOT NULL, firstName TEXT NOT NULL, height REAL, maidenName TEXT, studentId INTEGER NOT NULL, surname TEXT NOT NULL, PRIMARY KEY(studentId))")
+
+        // A SQLException gets thrown
+        Mockito.`when`(conn.createStatement()).thenThrow(SQLException())
+        assertFailsWith<DatabaseException> {
+            orm.createTable(randomStudent())
+        }
     }
 
     @Test
@@ -93,6 +101,12 @@ class KormTest {
         orm.drop(Student::class)
 
         verify(statement).executeUpdate("DROP TABLE IF EXISTS Student")
+
+        // A SQLException gets thrown
+        Mockito.`when`(conn.createStatement()).thenThrow(SQLException())
+        assertFailsWith<DatabaseException> {
+            orm.drop(Student::class)
+        }
     }
 
     @Test
@@ -126,6 +140,12 @@ class KormTest {
         orm.insert(student)
 
         verify(conn).prepareStatement("INSERT INTO Student(age,firstName,height,maidenName,surname) VALUES(?,?,?,?,?)")
+
+        // A SQLException gets thrown
+        Mockito.`when`(conn.prepareStatement(any())).thenThrow(SQLException())
+        assertFailsWith<DatabaseException> {
+            orm.insert(student)
+        }
     }
 
     @Test
@@ -159,6 +179,137 @@ class KormTest {
         orm.update(Student::class, updater)
 
         verify(conn).prepareStatement("UPDATE Student SET age = ?, maidenName = NULL WHERE Student.age > ? AND Student.maidenName = ? AND Student.height IS NULL")
+
+        // A SQLException gets thrown
+        Mockito.`when`(conn.prepareStatement(any())).thenThrow(SQLException())
+        assertFailsWith<DatabaseException> {
+            orm.update(Student::class, updater)
+        }
+    }
+
+    @Test
+    fun testApplyEncoder_and_Decoder() {
+        val rand = Random()
+        val one = 1
+        val dog = Dog(name = "", yearOfBirth = 0, breed = "")
+        val dataValues = mapOf(
+                0 to rand.nextBoolean(),
+                1 to rand.nextFloat(),
+                2 to rand.nextForeignKeyFloat(),
+                3 to rand.nextForeignKeyInt(),
+                4 to rand.nextForeignKeyString(),
+                5 to rand.nextInt(),
+                6 to PrimaryKeyAuto(),
+                7 to rand.nextPrimaryKeyFloat(),
+                8 to rand.nextPrimaryKeyInt(),
+                9 to rand.nextPrimaryKeyString(),
+                10 to rand.nextString(),
+                11 to dog
+        )
+        val dataNulls = dataValues.mapKeys { it.key to null }
+
+        // Test encoder
+        @Suppress("UNCHECKED_CAST")
+        for (data in listOf(dataValues, dataNulls)) {
+            val conn = mock(Connection::class.java)
+            val statement = mock(PreparedStatement::class.java)
+            val orm = Korm(conn = conn)
+            var i = -1
+            orm.applyEncoder(Boolean::class.createType(), statement, ++i, data[i])
+            verify(statement, times(one)).setBool(i, data[i] as Boolean?)
+
+            orm.applyEncoder(Float::class.createType(), statement, ++i, data[i])
+            verify(statement, times(one)).setFloating(i, data[i] as Float?)
+
+            orm.applyEncoder(foreignKeyType(Float::class), statement, ++i, data[i])
+            verify(statement, times(one)).setFloating(i, (data[i] as ForeignKey<Float>?)?.value)
+
+            orm.applyEncoder(foreignKeyType(Int::class), statement, ++i, data[i])
+            verify(statement, times(one)).setInteger(i, (data[i] as ForeignKey<Int>?)?.value)
+
+            orm.applyEncoder(foreignKeyType(String::class), statement, ++i, data[i])
+            verify(statement, times(one)).setString(i, (data[i] as ForeignKey<String>?)?.value)
+
+            orm.applyEncoder(Int::class.createType(), statement, ++i, data[i])
+            verify(statement, times(one)).setInteger(i, data[i] as Int?)
+
+            orm.applyEncoder(PrimaryKeyAuto::class.createType(), statement, ++i, data[i])
+            verify(statement, times(one)).setInteger(i, (data[i] as PrimaryKeyAuto?)?.value)
+
+            orm.applyEncoder(primaryKeyType(Float::class), statement, ++i, data[i])
+            verify(statement, times(one)).setFloating(i, (data[i] as PrimaryKey<Float>?)?.value)
+
+            orm.applyEncoder(primaryKeyType(Int::class), statement, ++i, data[i])
+            verify(statement, times(one)).setInteger(i, (data[i] as PrimaryKey<Int>?)?.value)
+
+            orm.applyEncoder(primaryKeyType(String::class), statement, ++i, data[i])
+            verify(statement, times(one)).setString(i, (data[i] as PrimaryKey<String>?)?.value)
+
+            orm.applyEncoder(String::class.createType(), statement, ++i, data[i])
+            verify(statement, times(one)).setString(i, data[i] as String?)
+
+            assertFailsWith<UnsupportedDataTypeException> {
+                orm.applyEncoder(dog::class.createType(), statement, ++i, data[i])
+            }
+        }
+
+        // Test decoder
+//        mockkStatic("com.github.igniparoustempest.korm.SQLExtensionsKt")
+//        @Suppress("UNCHECKED_CAST")
+//        for (data in listOf(dataValues, dataNulls)) {
+//            val conn = mock(Connection::class.java)
+//            val rs = mock(ResultSet::class.java)
+//            val orm = Korm(conn = conn)
+//            var i = -1
+//            doReturn(data[0] == null).`when`(rs).wasNull()
+//
+//            doReturn(data[++i] as Boolean?).`when`(rs).getBool(blank)
+//            assertEquals(data[i], orm.applyDecoder(Boolean::class.createType(), rs, blank))
+//
+//            doReturn(data[++i] as Float?).`when`(rs).getFloating(blank)
+//            assertEquals(data[i], orm.applyDecoder(Float::class.createType(), rs, blank))
+//
+//            doReturn((data[++i] as ForeignKey<Float>?)?.value).`when`(rs).getFloating(blank)
+//            assertEquals(data[i], orm.applyDecoder(foreignKeyType(Float::class), rs, blank))
+//
+//            doReturn((data[++i] as ForeignKey<Int>?)?.value).`when`(rs).getInteger(blank)
+//            assertEquals(data[i], orm.applyDecoder(foreignKeyType(Int::class), rs, blank))
+//
+//            doReturn((data[++i] as ForeignKey<String>?)?.value).`when`(rs).getString(blank)
+//            assertEquals(data[i], orm.applyDecoder(foreignKeyType(String::class), rs, blank))
+//
+//            doReturn(data[++i] as Int?).`when`(rs).getInteger(blank)
+//            assertEquals(data[i], orm.applyDecoder(Int::class.createType(), rs, blank))
+//
+//            doReturn((data[++i] as PrimaryKeyAuto?)?.value).`when`(rs).getInteger(blank)
+//            assertEquals(data[i], orm.applyDecoder(PrimaryKeyAuto::class.createType(), rs, blank))
+//
+//            doReturn((data[++i] as PrimaryKey<Float>?)?.value).`when`(rs).getFloating(blank)
+//            assertEquals(data[i], orm.applyDecoder(primaryKeyType(Float::class), rs, blank))
+//
+//            doReturn((data[++i] as PrimaryKey<Int>?)?.value).`when`(rs).getInteger(blank)
+//            assertEquals(data[i], orm.applyDecoder(primaryKeyType(Int::class), rs, blank))
+//
+//            doReturn((data[++i] as PrimaryKey<String>?)?.value).`when`(rs).getString(blank)
+//            assertEquals(data[i], orm.applyDecoder(primaryKeyType(String::class), rs, blank))
+//
+//            doReturn(data[++i] as String?).`when`(rs).getString(blank)
+//            assertEquals(data[i], orm.applyDecoder(String::class.createType(), rs, blank))
+//
+//            assertFailsWith<UnsupportedDataTypeException> {
+//                orm.applyDecoder(dog::class.createType(), rs, blank)
+//            }
+//        }
+    }
+
+    @Test
+    fun integrationCreateTable() {
+        val student = randomStudent()
+        val orm = Korm()
+        // Creates table
+        orm.createTable(student)
+        // Does not fail if asked to create table that already exists
+        orm.createTable(student)
     }
 
     @Test
@@ -178,6 +329,9 @@ class KormTest {
         var students = (1..10).map { randomStudent() }
 
         val orm = Korm()
+
+        // Delete from table that doesn't exist
+        orm.delete(Student::class, Student::studentId eq 1)
 
         // Save data
         students = students.map { orm.insert(it) }
@@ -199,6 +353,9 @@ class KormTest {
         val students = (1..10).map { randomStudent() }
 
         val orm = Korm()
+
+        // Drop table that doesn't exist
+        orm.drop(Student::class)
 
         // Save data
         for (student in students)
@@ -281,6 +438,10 @@ class KormTest {
 
         val orm = Korm()
 
+        assertFailsWith<UnsupportedDataTypeException> {
+            orm.insert(students[0])
+        }
+
         // Add the encoder/decoder for the Discipline type
         val encoder: Encoder<Discipline> = { ps, parameterIndex, x -> ps.setString(parameterIndex, x.toString())}
         val decoder: Decoder<Discipline> = { rs, columnLabel -> Discipline.fromString(rs.getString(columnLabel))}
@@ -355,6 +516,12 @@ class KormTest {
             while (it.next())
                 retrieved.add(Pair(it.getInt("id"), it.getString("data")))
         }
+        assertFailsWith<DatabaseException> {
+            orm.rawSql("Malformed SQL")
+        }
+        assertFailsWith<DatabaseException> {
+            orm.rawSqlQuery("INSERT INTO Test(id, data) VALUES (33, 'dec')")
+        }
         orm.rawSql("DROP TABLE Test")
 
         val expected = listOf(Pair(1, "jkl"), Pair(2, "abbc"), Pair(5, "def"), Pair(7, "ghi"))
@@ -380,12 +547,15 @@ class KormTest {
 
         // Update table that exists
         orm.update(Student::class, updater)
-
         condition = (Student::age eq 100) and (Student::maidenName eq null) and Student::height.isNull()
         val retrievedStudents = orm.find(Student::class, condition)
 
+        orm.update(Student::class, Student::age set 100)
+        val retrievedStudents100 = orm.find(Student::class, Student::age eq 100)
+
         // Run tests
         assertEquals(4, retrievedStudents.size, "Should update correctly")
+        assertEquals(students.size, retrievedStudents100.size, "Should update correctly")
         orm.close()
     }
 }
