@@ -1,6 +1,6 @@
 package com.github.igniparoustempest.korm.types
 
-import com.github.igniparoustempest.korm.OrmHelper.Companion.tableName
+import com.github.igniparoustempest.korm.helper.tableName
 import kotlin.reflect.KProperty1
 
 class ForeignKey<T: Any>(private val foreignColumn: String?, private val foreignTable: String?, val value: T) {

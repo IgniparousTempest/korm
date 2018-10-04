@@ -1,14 +1,14 @@
 package com.github.igniparoustempest.korm
 
-import com.github.igniparoustempest.korm.OrmHelper.Companion.columnNames
-import com.github.igniparoustempest.korm.OrmHelper.Companion.foreignKeyColumns
-import com.github.igniparoustempest.korm.OrmHelper.Companion.foreignKeyType
-import com.github.igniparoustempest.korm.OrmHelper.Companion.isPrimaryKeyAuto
-import com.github.igniparoustempest.korm.OrmHelper.Companion.isUnsetPrimaryKeyAuto
-import com.github.igniparoustempest.korm.OrmHelper.Companion.primaryKeyColumns
-import com.github.igniparoustempest.korm.OrmHelper.Companion.primaryKeyType
-import com.github.igniparoustempest.korm.OrmHelper.Companion.readProperty
-import com.github.igniparoustempest.korm.OrmHelper.Companion.tableName
+import com.github.igniparoustempest.korm.helper.columnNames
+import com.github.igniparoustempest.korm.helper.foreignKeyColumns
+import com.github.igniparoustempest.korm.helper.foreignKeyType
+import com.github.igniparoustempest.korm.helper.isPrimaryKeyAuto
+import com.github.igniparoustempest.korm.helper.isUnsetPrimaryKeyAuto
+import com.github.igniparoustempest.korm.helper.primaryKeyColumns
+import com.github.igniparoustempest.korm.helper.primaryKeyType
+import com.github.igniparoustempest.korm.helper.readProperty
+import com.github.igniparoustempest.korm.helper.tableName
 import com.github.igniparoustempest.korm.exceptions.DatabaseException
 import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
 import com.github.igniparoustempest.korm.types.ForeignKey
@@ -20,16 +20,13 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.SQLException
 import kotlin.reflect.KClass
-import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
 import kotlin.reflect.full.createType
-import kotlin.reflect.full.declaredMemberProperties
 import kotlin.reflect.full.instanceParameter
 import kotlin.reflect.full.memberFunctions
 import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.full.withNullability
 import kotlin.reflect.jvm.reflect
-
 
 class Korm(private val conn: Connection) {
     constructor(): this(DriverManager.getConnection("jdbc:sqlite::memory:", KormConfig().toProperties()))
@@ -293,7 +290,7 @@ class Korm(private val conn: Connection) {
         addCoder(KormCoder(encoder, decoder, dataType))
     }
 
-    private fun <T: Any> applyEncoder(type: KType, pstmt: PreparedStatement, index: Int, data: T?) {
+    internal fun <T: Any> applyEncoder(type: KType, pstmt: PreparedStatement, index: Int, data: T?) {
         if (coders.contains(type))
             coders[type]!!.encoder(pstmt, index, data)
         else
@@ -301,20 +298,20 @@ class Korm(private val conn: Connection) {
             when (type) {
                 Boolean::class.createType() -> pstmt.setBool(index, data as Boolean?)
                 Float::class.createType() -> pstmt.setFloating(index, data as Float?)
-                foreignKeyType(Float::class) -> pstmt.setFloating(index, (data as ForeignKey<Float>).value)
-                foreignKeyType(Int::class) -> pstmt.setInteger(index, (data as ForeignKey<Int>).value)
-                foreignKeyType(String::class) -> pstmt.setString(index, (data as ForeignKey<String>).value)
+                foreignKeyType(Float::class) -> pstmt.setFloating(index, (data as ForeignKey<Float>?)?.value)
+                foreignKeyType(Int::class) -> pstmt.setInteger(index, (data as ForeignKey<Int>?)?.value)
+                foreignKeyType(String::class) -> pstmt.setString(index, (data as ForeignKey<String>?)?.value)
                 Int::class.createType() -> pstmt.setInteger(index, data as Int?)
-                PrimaryKeyAuto::class.createType() -> pstmt.setInteger(index, (data as PrimaryKey<Int>).value)
-                primaryKeyType(Float::class) -> pstmt.setFloating(index, (data as PrimaryKey<Float>).value)
-                primaryKeyType(Int::class) -> pstmt.setInteger(index, (data as PrimaryKey<Int>).value)
-                primaryKeyType(String::class) -> pstmt.setString(index, (data as PrimaryKey<String>).value)
+                PrimaryKeyAuto::class.createType() -> pstmt.setInteger(index, (data as PrimaryKeyAuto?)?.value)
+                primaryKeyType(Float::class) -> pstmt.setFloating(index, (data as PrimaryKey<Float>?)?.value)
+                primaryKeyType(Int::class) -> pstmt.setInteger(index, (data as PrimaryKey<Int>?)?.value)
+                primaryKeyType(String::class) -> pstmt.setString(index, (data as PrimaryKey<String>?)?.value)
                 String::class.createType() -> pstmt.setString(index, data as String?)
                 else -> throw UnsupportedDataTypeException("Invalid data type $type.")
             }
     }
 
-    private fun applyDecoder(type: KType, rs: ResultSet, columnName: String?): Any? {
+    internal fun applyDecoder(type: KType, rs: ResultSet, columnName: String?): Any? {
         return if (coders.contains(type))
             coders[type]!!.decoder(rs, columnName)
         else
