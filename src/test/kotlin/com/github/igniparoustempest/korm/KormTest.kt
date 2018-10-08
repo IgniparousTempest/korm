@@ -9,6 +9,7 @@ import com.github.igniparoustempest.korm.testingtables.*
 import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKey
 import com.github.igniparoustempest.korm.types.PrimaryKeyAuto
+import com.github.igniparoustempest.korm.types.Row
 import com.github.igniparoustempest.korm.updates.*
 import org.fluttercode.datafactory.impl.DataFactory
 import org.junit.jupiter.api.Test
@@ -18,6 +19,7 @@ import org.mockito.Mockito.*
 import java.nio.file.Paths
 import java.sql.*
 import java.util.*
+import kotlin.collections.HashMap
 import kotlin.reflect.full.createType
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -165,6 +167,19 @@ class KormTest {
         queries.forEach {
             verify(statement).executeUpdate(it)
             verify(statement).executeQuery(it)
+        }
+
+        val rs = mock(ResultSet::class.java)
+        val rsmd = mock(ResultSetMetaData::class.java)
+        Mockito.`when`(rs.metaData).thenReturn(rsmd)
+        Mockito.`when`(rs.next()).thenReturn(true).thenReturn(false)
+        Mockito.`when`(rsmd.columnCount).thenReturn(1)
+        Mockito.`when`(rsmd.getColumnName(1)).thenReturn("")
+        Mockito.`when`(rsmd.getColumnType(1)).thenReturn(Int.MIN_VALUE)
+        Mockito.`when`(conn.createStatement()).thenReturn(statement)
+        Mockito.`when`(statement.executeQuery("valid SQL")).thenReturn(rs)
+        assertFailsWith<DatabaseException> {
+            orm.rawSqlQuery("valid SQL")
         }
     }
 
@@ -516,6 +531,7 @@ class KormTest {
             while (it.next())
                 retrieved.add(Pair(it.getInt("id"), it.getString("data")))
         }
+        val retrievedTable = orm.rawSqlQuery("SELECT * FROM Test")
         assertFailsWith<DatabaseException> {
             orm.rawSql("Malformed SQL")
         }
@@ -525,7 +541,9 @@ class KormTest {
         orm.rawSql("DROP TABLE Test")
 
         val expected = listOf(Pair(1, "jkl"), Pair(2, "abbc"), Pair(5, "def"), Pair(7, "ghi"))
+        val expectedTable = listOf(mapOf("id" to 1, "data" to "jkl"), mapOf("id" to 2, "data" to "abbc"), mapOf("id" to 5, "data" to "def"), mapOf("id" to 7, "data" to "ghi"))
         assertEquals(expected, retrieved, "Should preserve foreign keys when inserting.")
+        assertEquals(expectedTable.map { Row(it) }, retrievedTable.rows, "Should preserve foreign keys when inserting.")
         orm.close()
     }
 
