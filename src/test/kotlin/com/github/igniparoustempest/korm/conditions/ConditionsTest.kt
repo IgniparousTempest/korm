@@ -10,9 +10,9 @@ class ConditionsTest {
         val neqValue = Dog::breed neq "Dalmatian"
         val neqNull = Dog::breed neq null
 
-        assertEquals("Dog.breed != ?", neqValue.sql)
+        assertEquals("`Dog`.`breed` != ?", neqValue.sql)
         assertEquals(listOf("Dalmatian"), neqValue.values)
-        assertEquals("Dog.breed IS NOT NULL", neqNull.sql)
+        assertEquals("`Dog`.`breed` IS NOT NULL", neqNull.sql)
         assertEquals(emptyList(), neqNull.values)
     }
 }

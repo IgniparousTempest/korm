@@ -21,7 +21,7 @@ class UpdatesTest {
         for(table in listOf(left, right, leftAndRight)) {
             assertEquals("breed = ?, name = ?", table.sql)
             assertEquals(listOf(2, 21), table.values)
-            assertEquals("Dog.dogId = ?", table.condition?.sql)
+            assertEquals("`Dog`.`dogId` = ?", table.condition?.sql)
             assertEquals(listOf(3), table.condition?.values)
         }
     }

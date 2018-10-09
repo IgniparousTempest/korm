@@ -91,7 +91,7 @@ class KormTest {
         Mockito.`when`(conn.prepareStatement(any())).thenReturn(statement)
         orm.delete(Student::class, (Student::studentId eq 2) and (Student::age eq 12))
 
-        verify(conn).prepareStatement("DELETE FROM Student WHERE Student.studentId = ? AND Student.age = ?")
+        verify(conn).prepareStatement("DELETE FROM Student WHERE `Student`.`studentId` = ? AND `Student`.`age` = ?")
     }
 
     @Test
@@ -126,7 +126,7 @@ class KormTest {
         val conditions = (Student::firstName eq "Donald") and (Student::age lte 22)
         orm.find(Student::class, conditions)
 
-        verify(conn).prepareStatement("SELECT * FROM Student WHERE Student.firstName = ? AND Student.age <= ?")
+        verify(conn).prepareStatement("SELECT * FROM Student WHERE `Student`.`firstName` = ? AND `Student`.`age` <= ?")
     }
 
     @Test
@@ -193,7 +193,7 @@ class KormTest {
         val updater = (Student::age set 100) and (Student::maidenName set null) onCondition condition
         orm.update(Student::class, updater)
 
-        verify(conn).prepareStatement("UPDATE Student SET age = ?, maidenName = NULL WHERE Student.age > ? AND Student.maidenName = ? AND Student.height IS NULL")
+        verify(conn).prepareStatement("UPDATE Student SET age = ?, maidenName = NULL WHERE `Student`.`age` > ? AND `Student`.`maidenName` = ? AND `Student`.`height` IS NULL")
 
         // A SQLException gets thrown
         Mockito.`when`(conn.prepareStatement(any())).thenThrow(SQLException())

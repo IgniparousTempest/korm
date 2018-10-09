@@ -282,6 +282,10 @@ class Korm(private val conn: Connection) {
         }
     }
 
+    /**
+     * @see com.github.igniparoustempest.korm.Korm#rawSqlQuery(String, (ResultSet) -> Unit)
+     * @return The Table converted from the ResultSet.
+     */
     fun rawSqlQuery(sql: String): Table {
         var table = Table()
         rawSqlQuery(sql) { rs: ResultSet ->
