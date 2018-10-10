@@ -42,16 +42,6 @@ fun <T: KClass<*>> columnNames(clazz: T): List<KProperty1<out String, Any?>> {
  * Gets fully qualified name of a column.
  * Eg age => Student.age
  */
-@Deprecated("use escapedFullyQualifiedName instead")
-fun <T, R: Any> fullyQualifiedName(property: KProperty1<T, R?>): String {
-    val tableName = tableName(property)
-    return tableName + "." + property.name
-}
-
-/**
- * Gets fully qualified name of a column.
- * Eg age => Student.age
- */
 fun <T, R: Any> escapedFullyQualifiedName(property: KProperty1<T, R?>): String {
     val tableName = tableName(property)
     val columnName = property.name

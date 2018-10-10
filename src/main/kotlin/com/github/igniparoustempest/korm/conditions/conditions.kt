@@ -6,10 +6,12 @@ import kotlin.reflect.KProperty1
 
 infix fun <T, R: Any> KProperty1<T, R?>.eq(value: R?): KormCondition {
     val columnName = escapedFullyQualifiedName(this)
-    return if (value == null)
-        isNull()
-    else
-        KormCondition("$columnName = ?", listOf(value))
+    val sql = "$columnName = ?"
+    return when (value) {
+        null -> isNull()
+        is KProperty1<*,*> -> KormCondition(conditionWithColumn(sql, value), emptyList())
+        else -> KormCondition(sql, listOf(value))
+    }
 }
 
 infix fun <T, R: Any> KProperty1<T, R?>.neq(value: R?): KormCondition {
@@ -78,4 +80,9 @@ infix fun KormCondition.and(other: KormCondition): KormCondition {
 
 infix fun KormCondition.or(other: KormCondition): KormCondition {
     return KormCondition(this.sql + " OR " + other.sql, this.values + other.values)
+}
+
+fun conditionWithColumn(sql: String, value: KProperty1<*, *>): String {
+    val otherColumnName = escapedFullyQualifiedName(value)
+    return sql.replace("?", otherColumnName)
 }
