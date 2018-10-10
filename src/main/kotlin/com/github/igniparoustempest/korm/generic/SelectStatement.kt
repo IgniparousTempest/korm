@@ -1,3 +1,3 @@
 package com.github.igniparoustempest.korm.generic
 
-class SelectStatement(sql: String): ValidSql(sql, emptyList())
+class SelectStatement(sql: String): SelectLikeStatement(sql, emptyList())

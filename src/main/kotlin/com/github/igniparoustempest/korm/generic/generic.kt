@@ -32,3 +32,9 @@ infix fun JoinLeft.on(expression: KormCondition): SelectWithJoinClause {
     val sql = " ON $expressionSQL"
     return SelectWithJoinClause(this.sql + sql, expression.values)
 }
+
+infix fun SelectStatement.where(expression: KormCondition): SelectWithWhereClause {
+    val expressionSQL = expression.sql
+    val sql = " WHERE $expressionSQL"
+    return SelectWithWhereClause(this.sql + sql, expression.values)
+}

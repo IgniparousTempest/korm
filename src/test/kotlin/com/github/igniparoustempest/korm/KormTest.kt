@@ -3,6 +3,11 @@ package com.github.igniparoustempest.korm
 import com.github.igniparoustempest.korm.conditions.*
 import com.github.igniparoustempest.korm.exceptions.DatabaseException
 import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
+import com.github.igniparoustempest.korm.generic.from
+import com.github.igniparoustempest.korm.generic.innerJoin
+import com.github.igniparoustempest.korm.generic.on
+import com.github.igniparoustempest.korm.generic.selectAll
+import com.github.igniparoustempest.korm.generic.where
 import com.github.igniparoustempest.korm.helper.foreignKeyType
 import com.github.igniparoustempest.korm.helper.primaryKeyType
 import com.github.igniparoustempest.korm.testingtables.*
@@ -10,6 +15,7 @@ import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKey
 import com.github.igniparoustempest.korm.types.PrimaryKeyAuto
 import com.github.igniparoustempest.korm.types.Row
+import com.github.igniparoustempest.korm.types.Table
 import com.github.igniparoustempest.korm.updates.*
 import org.fluttercode.datafactory.impl.DataFactory
 import org.junit.jupiter.api.Test
@@ -18,8 +24,7 @@ import org.mockito.Mockito
 import org.mockito.Mockito.*
 import java.nio.file.Paths
 import java.sql.*
-import java.util.*
-import kotlin.collections.HashMap
+import java.util.Random
 import kotlin.reflect.full.createType
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -422,6 +427,30 @@ class KormTest {
         assertEquals(4, retrievedStudents.size, "Should work with complex conditions")
         assertEquals(emptyList(), orm.find(Student::class, Student::age eq -999), "Should not fail when there aren't rows")
         assertEquals(emptyList(), orm.find(StudentFK::class), "Should not fail on a table that doesn't exist")
+        orm.close()
+    }
+
+    @Test
+    fun integrationFindGeneric() {
+        val orm = Korm()
+        val rand = Random(1)
+        val departments = (1..4).map { orm.insert(Department(PrimaryKeyAuto(it), "a".repeat(it))) }
+        val students = (1..10).map { orm.insert(StudentFK(PrimaryKeyAuto(it), "z".repeat(rand.nextInt(5)), ForeignKey(Department::departmentId, PrimaryKey(rand.nextInt(4) + 1)))) }
+
+        // Retrieve data
+        val table1 = orm.find(selectAll() from StudentFK::class)
+        val table2 = orm.find(selectAll() from StudentFK::class where (StudentFK::name eq "zz"))
+        val table3 = orm.find(selectAll() from Department::class innerJoin StudentFK::class on (Department::departmentId eq StudentFK::departmentId))
+
+        fun studentFkMapper(it: StudentFK) = Row(mapOf("studentId" to it.studentId.value, "name" to it.name, "departmentId" to it.departmentId.value))
+        val expected1 = Table(students.map { studentFkMapper(it) })
+        val expected2 = Table(students.asSequence().map { studentFkMapper(it) }.filter { it["name"] == "zz" }.toList())
+        val expected3 = Table(expected1.rows.map { Row(mapOf("studentId" to it["studentId"], "name" to departments.first { d -> d.departmentId.value == it["departmentId"]}.name, "departmentId" to it["departmentId"])) })
+
+        // Run tests
+        assertEquals(expected1, table1)
+        assertEquals(expected2, table2)
+        assertEquals(expected3, table3)
         orm.close()
     }
 

@@ -5,32 +5,9 @@ import com.github.igniparoustempest.korm.getInteger
 import java.sql.ResultSet
 import java.sql.Types
 
-open class Table(rs: ResultSet? = null) {
-    internal val rows: List<Row<Any>>
-
-    init {
-        val _rows = mutableListOf<Map<String, Any?>>()
-        if (rs != null) {
-            val rsmd = rs.metaData
-            if (rsmd != null) {
-                val columnsNumber = rsmd.columnCount
-                while (rs.next()) {
-                    val map = mutableMapOf<String, Any?>()
-                    for (i in 1..columnsNumber) {
-                        val label = rsmd.getColumnName(i)
-                        map[label] = when (rsmd.getColumnType(i)) {
-                            Types.FLOAT, Types.REAL -> rs.getFloating(label)
-                            Types.INTEGER -> rs.getInteger(label)
-                            Types.VARCHAR -> rs.getString(label)
-                            else -> throw Exception("The column $label had an unknown SQL type with number ${rsmd.getColumnType(i)}")
-                        }
-                    }
-                    _rows.add(map as HashMap<String, Any?>)
-                }
-            }
-        }
-        rows = _rows.map { Row(it) }
-    }
+open class Table(_rows: List<Row<Any>>? = null) {
+    constructor(rs: ResultSet): this(resultSetToRows(rs))
+    internal val rows: List<Row<Any>> = _rows ?: emptyList()
 
     operator fun get(i: Int) = rows[i]
 
@@ -66,5 +43,43 @@ open class Table(rs: ResultSet? = null) {
             str.substring(0, columnWidth - 3) + "..."
         else
             str.padEnd(columnWidth)
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Table) return false
+
+        if (rows != other.rows) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return rows.hashCode()
+    }
+
+    companion object {
+        fun resultSetToRows(rs: ResultSet): List<Row<Any>> {
+
+            val mutableRows = mutableListOf<Map<String, Any?>>()
+            val rsmd = rs.metaData
+            if (rsmd != null) {
+                val columnsNumber = rsmd.columnCount
+                while (rs.next()) {
+                    val map = mutableMapOf<String, Any?>()
+                    for (i in 1..columnsNumber) {
+                        val label = rsmd.getColumnName(i)
+                        map[label] = when (rsmd.getColumnType(i)) {
+                            Types.FLOAT, Types.REAL -> rs.getFloating(label)
+                            Types.INTEGER -> rs.getInteger(label)
+                            Types.VARCHAR -> rs.getString(label)
+                            else -> throw Exception("The column $label had an unknown SQL type with number ${rsmd.getColumnType(i)}")
+                        }
+                    }
+                    mutableRows.add(map as HashMap<String, Any?>)
+                }
+            }
+            return mutableRows.map { Row(it) }
+        }
     }
 }

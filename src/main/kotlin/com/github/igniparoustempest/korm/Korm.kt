@@ -11,6 +11,7 @@ import com.github.igniparoustempest.korm.helper.readProperty
 import com.github.igniparoustempest.korm.helper.tableName
 import com.github.igniparoustempest.korm.exceptions.DatabaseException
 import com.github.igniparoustempest.korm.exceptions.UnsupportedDataTypeException
+import com.github.igniparoustempest.korm.generic.SelectLikeStatement
 import com.github.igniparoustempest.korm.types.ForeignKey
 import com.github.igniparoustempest.korm.types.PrimaryKey
 import com.github.igniparoustempest.korm.types.PrimaryKeyAuto
@@ -20,7 +21,6 @@ import java.sql.DriverManager
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.SQLException
-import java.sql.Types
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.full.createType
@@ -172,6 +172,24 @@ class Korm(private val conn: Connection) {
         }
 
         return results
+    }
+
+    fun find(statement: SelectLikeStatement): Table {
+        try {
+            val pstmt = conn.prepareStatement(statement.sql)
+            statement.values.forEachIndexed { i, col ->
+                applyEncoder(col::class.createType(nullable = false), pstmt, i + 1, col)
+            }
+            val rs = pstmt.executeQuery()
+
+            val table = Table(rs)
+
+            rs.close()
+            pstmt.close()
+            return table
+        } catch (e: SQLException) {
+            throw DatabaseException("An impassable error occurred while trying to find rows.", e, statement.sql)
+        }
     }
 
     /**
